@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 
 <head>
   <!--meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;"-->
@@ -15,8 +15,8 @@
   <title>OBESUM</title>
 </head>
 
-<body>
-  <div id="app" class="container mt-3">
+<body class="h-100">
+  <div id="app" class="container h-100 pt-3">
     <router-view></router-view>
   </div>
 
@@ -29,11 +29,13 @@
 
   <script>
 
+    const USERNAME_SUFFIX = '@obesum.xyz';
+
     firebase.initializeApp({
-      apiKey: "AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ",
-      authDomain: "obesum-978f6.firebaseapp.com",
-      projectId: "obesum-978f6",
-      appId: "1:758254882474:web:6c029dede9e22070658ad3",
+      apiKey: 'AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ',
+      authDomain: 'obesum-978f6.firebaseapp.com',
+      projectId: 'obesum-978f6',
+      appId: '1:758254882474:web:6c029dede9e22070658ad3',
     });
 
     var auth = firebase.auth();
@@ -69,7 +71,7 @@
 
           auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
           .then(function() {
-            auth.signInWithEmailAndPassword(that.username + '@obesum.xyz', that.password)
+            auth.signInWithEmailAndPassword(that.username + USERNAME_SUFFIX, that.password)
             .then(function() {
               that.loading = false;
               router.push({ path: '/' });
@@ -112,7 +114,9 @@
       template: `
       <div>
       <h1>Logging out...</h1>
-      <img src="images/spinner.gif">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
       </div>
       `,
       created: function() {
@@ -151,18 +155,21 @@
 
             var user = credential.user;
 
-            db.collection("users").doc(user.uid).set({
+            db.collection('users').doc(user.uid).set({
               name: that.name,
-              age: that.age,
+              age: parseInt(that.age),
               gender: that.gender,
-              height: that.height,
-              weight: that.weight,
+              height: parseInt(that.height),
+              weight: parseInt(that.weight),
+              diet_plan: 'blank',
+              last_updated: firebase.firestore.FieldValue.serverTimestamp(),
             })
             .then(function() {
               that.loading = false;
               that.success = true;
             })
             .catch(function(error) {
+              console.log(error);
               that.loading = false;
               that.error = error.message;
             });
@@ -217,7 +224,9 @@
             <input type="number" class="form-control" id="register-weight" v-model="weight">
           </div>
           <button type="submit" class="btn btn-primary">Register</button>
-          <img src="images/spinner.gif" v-show="loading">
+          <div class="spinner-border" role="status" v-show="loading">
+            <span class="sr-only">Loading...</span>
+          </div>
         </form>
 
         <router-link to="/login">Already have an account? Login</router-link>
@@ -226,43 +235,81 @@
     };
     const Profile = {
       template: `
-      <div>
+      <div class="h-100">
         <h1>Profile</h1>
-        {{ username }}
-        {{ name }}
-        {{ age }}
-        {{ gender }}
-        {{ height }}
-        {{ weight }}
-        <router-link to="/logout">Logout</router-link>
+        <div class="spinner-border" role="status" v-if="name == ''">
+          <span class="sr-only">Loading...</span>
+        </div>
+        <div v-else>
+          <div class="row">
+            <div class="col-sm-2">
+              <h3>{{ username }}</h3>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-2"><h3>Start BMI</h3></div>
+            <div class="col-sm">{{ startBMI }}</div>
+          </div>
+          <div class="row">
+            <div class="col-sm-2"><h3>Current BMI</h3></div>
+            <div class="col-sm">{{ startBMI }}</div>
+          </div>
+          <div class="row">
+            <div class="col-sm-2"><h3>Your option</h3></div>
+            <div class="col-sm"><router-link class="btn btn-primary" to="/diet_plan" v-if="diet_plan == 'blank'">Diet Plan</router-link></div>
+          </div>
+        </div>
+
+        <div class="fixed-bottom pb-3">
+          <div class="container">
+            <router-link to="/profile">Profile</router-link>
+            <router-link to="/diet_plan">Diet Plan</router-link>
+            <router-link to="/settings">Settings</router-link>
+          </div>
+        </div>
       </div>
       `,
       data: function() {
         return {
+          user: null,
           uid: '',
-          username: '',
+          email: '',
           name: '',
           age: 25,
           gender: 'm',
           height: 160,
           weight: 60,
+          diet_plan: 'blank',
         };
+      },
+      computed: {
+        username: function() {
+          return this.email.slice(0, 0 - USERNAME_SUFFIX.length);
+        },
+        startBMI: function() {
+          var bmi = this.weight / (this.height * this.height / 10000);
+          return Math.round((bmi + Number.EPSILON) * 100) / 100;
+        },
       },
       created: function() {
         var that = this;
 
         auth.onAuthStateChanged(function(user) {
           if (user) {
+            that.user = user;
             that.uid = user.uid;
-            that.username = user.email;
+            that.email = user.email;
 
             db.collection('users').doc(user.uid).get().then((doc) => {
               var data = doc.data();
+              if(typeof data === 'undefined') return;
+
               that.name = data.name;
               that.age = data.age;
               that.gender = data.gender;
               that.weight = data.weight;
               that.height = data.height;
+              that.diet_plan = data.diet_plan;
             });
           } else {
             router.push({ path: '/' });
@@ -270,6 +317,96 @@
         });
       },
     };
+    // const Edit = {
+    //   data: function() {
+    //     return {
+    //       username: '',
+    //       password: '',
+    //       name: '',
+    //       age: 25,
+    //       gender: 'm',
+    //       height: 160,
+    //       weight: 60,
+    //       loading: false,
+    //       success: false,
+    //       error: '',
+    //     };
+    //   },
+    //   methods: {
+    //     edit: function() {
+    //       var that = this;
+    //       this.loading = true;
+
+    //       // db.collection('users').doc(user.uid).set({
+    //       //   name: that.name,
+    //       //   age: parseInt(that.age),
+    //       //   gender: that.gender,
+    //       //   height: parseInt(that.height),
+    //       //   weight: parseInt(that.weight),
+    //       //   diet_plan: 'blank',
+    //       //   last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+    //       // })
+    //       // .then(function() {
+    //       //   that.loading = false;
+    //       //   that.success = true;
+    //       // })
+    //       // .catch(function(error) {
+    //       //   console.log(error);
+    //       //   that.loading = false;
+    //       //   that.error = error.message;
+    //       // });
+    //       return false;
+    //     },
+    //   },
+    //   template: `
+    //   <div>
+    //     <h1>Edit</h1>
+    //     <div class="alert alert-success" role="alert" v-show="success">
+    //       Your profile information has been saved.
+    //     </div>
+    //     <div class="alert alert-danger" role="alert" v-show="error">
+    //       {{ error }}
+    //     </div>
+    //     <form v-on:submit="edit">
+    //       <div class="form-group">
+    //         <label for="edit-username">Username</label>
+    //         <input type="text" class="form-control" id="edit-username" v-model="username">
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-password">Password</label>
+    //         <input type="password" class="form-control" id="edit-password" v-model="password">
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-name">Name</label>
+    //         <input type="text" class="form-control" id="edit-name" v-model="name">
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-password">Age</label>
+    //         <input type="number" class="form-control" id="edit-age" v-model="age">
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-gender">Gender</label>
+    //         <select id="edit-gender">
+    //           <option value="m">Male</option>
+    //           <option value="f">Female</option>
+    //         </select>
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-height">Height</label>
+    //         <input type="number" class="form-control" id="edit-height" v-model="height">
+    //       </div>
+    //       <div class="form-group">
+    //         <label for="edit-weight">Weight</label>
+    //         <input type="number" class="form-control" id="edit-weight" v-model="weight">
+    //       </div>
+    //       <button type="submit" class="btn btn-primary">Edit</button>
+    //       <img src="images/spinner.gif" v-show="loading">
+    //     </form>
+
+    //     <router-link to="/profile">Cancel</router-link>
+    //   </div>
+    //   `,
+    // };
 
     const routes = [
       { path: '/', component: Splash },
@@ -277,6 +414,7 @@
       { path: '/logout', component: Logout },
       { path: '/register', component: Register },
       { path: '/profile', component: Profile },
+      // { path: '/edit', component: Edit },
     ];
 
     var router = new VueRouter({
