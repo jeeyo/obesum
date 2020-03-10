@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="h-100">
+<html>
 
 <head>
   <!--meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;"-->
@@ -15,8 +15,8 @@
   <title>OBESUM</title>
 </head>
 
-<body class="h-100">
-  <div id="app" class="container h-100 pt-3">
+<body>
+  <div id="app" class="container pt-3">
     <router-view></router-view>
   </div>
 
@@ -26,10 +26,18 @@
   <script type="text/javascript" src="js/moment.js"></script>
   <script type="text/javascript" src="js/popper.min.js"></script>
   <script type="text/javascript" src="js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="js/Chart.bundle.min.js"></script>
 
   <script>
 
     const USERNAME_SUFFIX = '@obesum.xyz';
+    const DIET_PLANS = {
+      blank: 'Please select your diet plan',
+      if: 'Intermittent Fasting (IF)',
+      lc: 'Low-carb (LC)',
+      lf: 'Low-fat (LF)',
+    };
+    const IF_FASTING_PERIOD_LENGTH = 16;
 
     firebase.initializeApp({
       apiKey: 'AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ',
@@ -41,21 +49,58 @@
     var auth = firebase.auth();
     var db = firebase.firestore();
 
-    const Splash = {
-      template: `
-      `,
-      created: function() {
-        auth.onAuthStateChanged(function(user) {
-          if (user) {
-            router.push({ path: '/profile' });
-          } else {
-            router.push({ path: '/login' });
-          }
-        });
+    let globalData = new Vue({
+      data: {
+        $error: '',
+        $userObject: null,
+        $userDocument: null,
       },
-    };
+    });
+
+    function updateUserDocument(doc, cb)
+    {
+      $('.loadingModal').modal({
+        backdrop: 'static',
+        keyboard: false,
+        focus: false,
+      });
+
+      db.collection('users').doc(globalData.$data.$userObject.uid).set(doc)
+      .then(function() {
+        globalData.$data.$userDocument = doc;
+        $('.loadingModal').modal('hide');
+        if(typeof cb === 'function') cb();
+      });
+    }
 
     const Login = {
+      template: `
+      <div>
+        <div class="text-center" v-if="loading">
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+        <div v-else>
+          <h1 class="mb-5">Login</h1 class="mb-5">
+          <div class="alert alert-danger" role="alert" v-show="error">
+            {{ error }}
+          </div>
+          <form v-on:submit="login">
+            <div class="form-group">
+              <label for="login-username">Username</label>
+              <input type="text" class="form-control" id="login-username" v-model="username">
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <input type="password" class="form-control" id="login-password" v-model="password">
+            </div>
+            <button class="btn btn-primary">Login</button>
+            <router-link to="/register">Register a new account</router-link>
+          </form>
+        </div>
+      </div>
+      `,
       data: function() {
         return {
           username: '',
@@ -72,9 +117,16 @@
           auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
           .then(function() {
             auth.signInWithEmailAndPassword(that.username + USERNAME_SUFFIX, that.password)
-            .then(function() {
-              that.loading = false;
-              router.push({ path: '/' });
+            .then(function(credential) {
+              globalData.$data.$userObject = credential.user;
+
+              db.collection('users').doc(credential.user.uid).get().then((doc) => {
+                that.loading = false;
+                var data = doc.data();
+                if(typeof data === 'undefined') return;
+
+                globalData.$data.$userDocument = data;
+              });
             })
             .catch(function(error) {
               that.loading = false;
@@ -88,40 +140,40 @@
           return false;
         },
       },
-      template: `
-      <div>
-        <h1>Login</h1>
-        <div class="alert alert-danger" role="alert" v-show="error">
-          {{ error }}
-        </div>
-        <form v-on:submit="login">
-          <div class="form-group">
-            <label for="login-username">Username</label>
-            <input type="text" class="form-control" id="login-username" v-model="username">
-          </div>
-          <div class="form-group">
-            <label for="login-password">Password</label>
-            <input type="password" class="form-control" id="login-password" v-model="password">
-          </div>
-          <button type="submit" class="btn btn-primary">Login</button>
-          <router-link to="/register">Register a new account</router-link>
-        </form>
-      </div>
-      `,
+      created: function() {
+        var that = this;
+        this.loading = true;
+        auth.onAuthStateChanged(function(user) {
+          if(user) {
+            globalData.$data.$userObject = user;
+
+            db.collection('users').doc(user.uid).get().then((doc) => {
+              that.loading = false;
+              var data = doc.data();
+              if(typeof data === 'undefined') return;
+
+              globalData.$data.$userDocument = data;
+              router.push({ path: '/profile' });
+            });
+          } else that.loading = false;
+        });
+      },
     };
 
     const Logout = {
       template: `
       <div>
-      <h1>Logging out...</h1>
-      <div class="spinner-border" role="status">
-        <span class="sr-only">Loading...</span>
-      </div>
+        <h1 class="mb-5">Logging out...</h1 class="mb-5">
+        <div class="spinner-border" role="status">
+          <span class="sr-only">Loading...</span>
+        </div>
       </div>
       `,
       created: function() {
         auth.signOut()
         .then(function() {
+          globalData.$data.$userObject = null;
+          globalData.$data.$userDocument = null;
           router.push({ path: '/' });
         })
         .catch(function(error) {
@@ -162,7 +214,18 @@
               height: parseInt(that.height),
               weight: parseInt(that.weight),
               diet_plan: 'blank',
-              last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+              bmi: [0, 0, 0],
+              fasting_period: {
+                mon: 12,
+                tue: 12,
+                wed: 12,
+                thu: 12,
+                fri: 12,
+                sat: 12,
+                sun: 12,
+              },
+              start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+              update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
             })
             .then(function() {
               that.loading = false;
@@ -183,7 +246,7 @@
       },
       template: `
       <div>
-        <h1>Register</h1>
+        <h1 class="mb-5">Register</h1 class="mb-5">
         <div class="alert alert-success" role="alert" v-show="success">
           Your account has been registered.
           <router-link to="/login">Login</router-link>
@@ -223,7 +286,7 @@
             <label for="register-weight">Weight</label>
             <input type="number" class="form-control" id="register-weight" v-model="weight">
           </div>
-          <button type="submit" class="btn btn-primary">Register</button>
+          <button class="btn btn-primary">Register</button>
           <div class="spinner-border" role="status" v-show="loading">
             <span class="sr-only">Loading...</span>
           </div>
@@ -235,36 +298,66 @@
     };
     const Profile = {
       template: `
-      <div class="h-100">
-        <h1>Profile</h1>
-        <div class="spinner-border" role="status" v-if="name == ''">
-          <span class="sr-only">Loading...</span>
-        </div>
-        <div v-else>
+      <div>
+        <h1 class="mb-5">Profile</h1 class="mb-5">
+        <div style="margin-bottom: 100px;">
           <div class="row">
-            <div class="col-sm-2">
+            <div class="col-sm-4">
               <h3>{{ username }}</h3>
             </div>
           </div>
           <div class="row">
-            <div class="col-sm-2"><h3>Start BMI</h3></div>
+            <div class="col-sm-4"><h3>Start BMI</h3></div>
             <div class="col-sm">{{ startBMI }}</div>
           </div>
           <div class="row">
-            <div class="col-sm-2"><h3>Current BMI</h3></div>
-            <div class="col-sm">{{ startBMI }}</div>
+            <div class="col-sm-4"><h3>Current BMI</h3></div>
+            <div class="col-sm">{{ currentBMI }}</div>
           </div>
           <div class="row">
-            <div class="col-sm-2"><h3>Your option</h3></div>
-            <div class="col-sm"><router-link class="btn btn-primary" to="/diet_plan" v-if="diet_plan == 'blank'">Diet Plan</router-link></div>
+            <div class="col-sm-4"><h3>Your option</h3></div>
+            <div class="col-sm">{{ dietPlan }}</div>
+          </div>
+          <div class="row">
+            <div class="col-sm-4"><router-link to="/logout">Logout</router-link></div>
           </div>
         </div>
 
-        <div class="fixed-bottom pb-3">
+        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
           <div class="container">
-            <router-link to="/profile">Profile</router-link>
-            <router-link to="/diet_plan">Diet Plan</router-link>
-            <router-link to="/settings">Settings</router-link>
+            <nav class="nav nav-pills nav-fill">
+              <router-link class="nav-item nav-link active" to="/profile">Profile</router-link>
+              <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
+              <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+            </nav>
+          </div>
+        </div>
+
+        <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" ref="weightModal">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="form-group">
+                  <label for="newWeight"><b>Weight</b></label>
+                  <input type="number" class="form-control" id="newWeight" v-model="new_weight">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-primary" v-on:click="updateWeight">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="spinner-border" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -272,49 +365,57 @@
       data: function() {
         return {
           user: null,
-          uid: '',
-          email: '',
-          name: '',
-          age: 25,
-          gender: 'm',
-          height: 160,
-          weight: 60,
-          diet_plan: 'blank',
+          doc: null,
+          new_weight: 0,
         };
+      },
+      methods: {
+        updateWeight: function() {
+          var that = this;
+          var newBMIIndex = this.doc.bmi.findIndex((b) => b == 0);
+          if(newBMIIndex == -1) return;
+
+          var bmi = parseInt(this.new_weight) / (this.doc.height * this.doc.height / 10000);
+          this.doc.bmi[newBMIIndex] = Math.round((bmi + Number.EPSILON) * 100) / 100;
+
+          this.doc.update_diet_on = firebase.firestore.FieldValue.serverTimestamp(),
+          updateUserDocument(this.doc, function() {
+            $(that.$refs['weightModal']).modal('hide');
+          });
+        },
       },
       computed: {
         username: function() {
-          return this.email.slice(0, 0 - USERNAME_SUFFIX.length);
+          return this.user.email.slice(0, 0 - USERNAME_SUFFIX.length);
         },
         startBMI: function() {
-          var bmi = this.weight / (this.height * this.height / 10000);
+          var bmi = this.doc.weight / (this.doc.height * this.doc.height / 10000);
           return Math.round((bmi + Number.EPSILON) * 100) / 100;
+        },
+        currentBMI: function() {
+          var latestBMI = this.doc.bmi.find((b) => b != 0);
+          if(typeof latestBMI === 'undefined') return this.startBMI;
+          return latestBMI;
+        },
+        dietPlan: function() {
+          return DIET_PLANS[this.doc.diet_plan];
+        },
+        lastUpdated: function() {
+          return moment.unix(this.doc.update_diet_on.seconds).format();
         },
       },
       created: function() {
-        var that = this;
-
-        auth.onAuthStateChanged(function(user) {
-          if (user) {
-            that.user = user;
-            that.uid = user.uid;
-            that.email = user.email;
-
-            db.collection('users').doc(user.uid).get().then((doc) => {
-              var data = doc.data();
-              if(typeof data === 'undefined') return;
-
-              that.name = data.name;
-              that.age = data.age;
-              that.gender = data.gender;
-              that.weight = data.weight;
-              that.height = data.height;
-              that.diet_plan = data.diet_plan;
-            });
-          } else {
-            router.push({ path: '/' });
-          }
-        });
+        this.user = globalData.$data.$userObject;
+        this.doc = globalData.$data.$userDocument;
+      },
+      mounted: function() {
+        if(moment().isSameOrAfter(moment.unix(this.doc.update_diet_on.seconds).add(7, 'days'))) {
+          $(this.$refs['weightModal']).modal({
+            backdrop: 'static',
+            keyboard: false,
+            focus: false,
+          });
+        }
       },
     };
     // const Edit = {
@@ -344,7 +445,7 @@
     //       //   height: parseInt(that.height),
     //       //   weight: parseInt(that.weight),
     //       //   diet_plan: 'blank',
-    //       //   last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+    //       //   update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
     //       // })
     //       // .then(function() {
     //       //   that.loading = false;
@@ -360,7 +461,7 @@
     //   },
     //   template: `
     //   <div>
-    //     <h1>Edit</h1>
+    //     <h1 class="mb-5">Edit</h1 class="mb-5">
     //     <div class="alert alert-success" role="alert" v-show="success">
     //       Your profile information has been saved.
     //     </div>
@@ -407,19 +508,290 @@
     //   </div>
     //   `,
     // };
+    const DietPlan = {
+      template: `
+      <div>
+        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }}</h1 class="mb-5">
+        <div v-if="doc.diet_plan == 'blank'">
+          <div class="card-deck">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">IF</h5>
+                <p class="card-text">การกินแบบจำกัดช่วงเวลา ซึ่งมีช่วงที่กินได้ [eating] กับ กินไม่ได้ [fasting] จะทำให้การเผาผลาญเปลี่ยนไป</p>
+              </div>
+              <div class="card-footer">
+                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'if'">Select</a>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">LC</h5>
+                <p class="card-text">การกินอาหารแบบกินคาร์โบไฮเดรตให้น้อยลง แต่อาจจะกินไขมันมากขึ้นแทน (ketogenic)</p>
+              </div>
+              <div class="card-footer">
+                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'lc'">Select</a>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">LF</h5>
+                <p class="card-text">รูปแบบการกินที่เรากินไขมันให้น้อย แต่กินคาร์โบไฮเดรตที่มีไฟเบอร์เยอะขึ้น</p>
+              </div>
+              <div class="card-footer">
+                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'lf'">Select</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 100px;" v-else-if="doc.diet_plan == 'if'">
+          <div class="row">
+            <canvas ref="ifChart" width="400" height="400" style="width: 400px !important; height: 400px !important;"></canvas>
+          </div>
+          <div class="row mt-3">
+            <div class="w-100 overflow-auto">
+              <table class="table mb-0" ref="ifTable">
+                <thead>
+                  <tr><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr><th>No eating</th></tr>
+                  <tr><th>No calories</th></tr>
+                </tbody>
+                <tfoot>
+                  <tr><th></th></tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+          <div class="container">
+            <nav class="nav nav-pills nav-fill">
+              <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
+              <router-link class="nav-item nav-link active" to="/diet_plan">Diet Plan</router-link>
+              <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+            </nav>
+          </div>
+        </div>
+
+        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="spinner-border" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      `,
+      data: function() {
+        return {
+          user: null,
+          doc: null,
+        };
+      },
+      created: function() {
+        this.user = globalData.$data.$userObject;
+        this.doc = globalData.$data.$userDocument;
+      },
+      mounted: function() {
+
+        if(this.doc.diet_plan == 'if')
+        {
+          var ctx = this.$refs['ifChart'].getContext('2d');
+          var myDoughnutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              datasets: [{
+                data: [IF_FASTING_PERIOD_LENGTH, 24 - IF_FASTING_PERIOD_LENGTH],
+                backgroundColor: ['red', 'blue'],
+              }],
+            },
+            options: {
+              rotation: -1 * (this.doc.fasting_period[moment().format('ddd').toLowerCase()] / 12) * Math.PI,
+              legends: { display: false },
+              tooltips: { enabled: false },
+              responsive: true,
+              maintainAspectRatio: false,
+            },
+          });
+
+          var table = $(this.$refs['ifTable']);
+          for(i = 0, d = moment.unix(this.doc.start_diet_on.seconds);
+              d.isBefore(moment.unix(this.doc.start_diet_on.seconds).add(21, 'days'));
+              i++, d.add(1, 'days'))
+          {
+            table.find('thead > tr').append(`
+              <th>${d.format('ddd')}</th>
+            `);
+            table.find('tbody > tr:eq(0)').append(`
+              <td>
+                <div class="custom-control custom-checkbox">
+                  <input type="checkbox" class="custom-control-input" id="noEating${i}" ${d.isSameOrBefore(moment(), 'day') ? '' : 'disabled'}>
+                  <label class="custom-control-label" for="noEating${i}"></label>
+                </div>
+              </td>
+            `);
+            table.find('tbody > tr:eq(1)').append(`
+              <td>
+                <div class="custom-control custom-checkbox">
+                  <input type="checkbox" class="custom-control-input" id="noCalories${i}" ${d.isSameOrBefore(moment(), 'day') ? '' : 'disabled'}>
+                  <label class="custom-control-label" for="noCalories${i}"></label>
+                </div>
+              </td>
+            `);
+
+            /* Week Separator */
+            if((i + 1) % 7 == 0)
+            {
+              table.find('thead > tr').append(`
+                <th></th>
+                <th></th>
+              `);
+              table.find('tbody > tr').append(`
+                <td></td>
+                <td></td>
+              `);
+              table.find('tfoot > tr').append(`
+                <td class="text-center" colspan="7"><b>Week ${Math.floor(i / 7)+ 1}</b></td>
+                <td></td>
+                <td></td>
+              `);
+            }
+          }
+        }
+      },
+      watch: {
+        doc: {
+          handler(oldDoc, newDoc) {
+            if(oldDoc == null || newDoc == null) return;
+            updateUserDocument(newDoc);
+          },
+          deep: true,
+        },
+      },
+    };
+    const Information = {
+      template: `
+      <div>
+        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }} Information</h1 class="mb-5">
+
+        <div style="margin-bottom: 100px;" v-if="doc.diet_plan == 'if'">
+          <div class="row" v-for="dow in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="dow">
+            <div class="col-sm-2">
+              <h3>{{ dow }}</h3>
+            </div>
+            <div class="col-sm">
+              <ul class="pagination">
+                <li class="page-item">
+                  <a class="page-link" href="#" v-on:click="decreaseHour(dow)">
+                    <span aria-hidden="true">&laquo;</span>
+                  </a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="#">
+                    {{ fastingPeriodStart(dow) }}.00 - {{ fastingPeriodEnd(dow) }}.00
+                  </a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="#" v-on:click="increaseHour(dow)">
+                    <span aria-hidden="true">&raquo;</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+          <div class="container">
+            <nav class="nav nav-pills nav-fill">
+              <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
+              <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
+              <router-link class="nav-item nav-link active" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+            </nav>
+          </div>
+        </div>
+
+        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="spinner-border" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      `,
+      data: function() {
+        return {
+          user: null,
+          doc: null,
+        };
+      },
+      methods: {
+        decreaseHour: function(dow) {
+          var newHour = this.doc.fasting_period[dow.toLowerCase()] - 1;
+          if(newHour < 0) newHour = 23;
+          this.doc.fasting_period[dow.toLowerCase()] = newHour;
+        },
+        increaseHour: function(dow) {
+          var newHour = this.doc.fasting_period[dow.toLowerCase()] + 1;
+          if(newHour > 23) newHour = 0;
+          this.doc.fasting_period[dow.toLowerCase()] = newHour;
+        },
+        fastingPeriodStart: function(dow) {
+          var start = this.doc.fasting_period[dow.toLowerCase()];
+          return start < 10 ? `0${start}` : `${start}`;
+        },
+        fastingPeriodEnd: function(dow) {
+          var end = this.doc.fasting_period[dow.toLowerCase()] + (24 - IF_FASTING_PERIOD_LENGTH);
+          if(end > 23) end = 0;
+          return end < 10 ? `0${end}` : `${end}`;
+        },
+      },
+      created: function() {
+        this.user = globalData.$data.$userObject;
+        this.doc = globalData.$data.$userDocument;
+      },
+      watch: {
+        doc: {
+          handler(oldDoc, newDoc) {
+            if(oldDoc == null || newDoc == null) return;
+            updateUserDocument(newDoc);
+          },
+          deep: true,
+        },
+      },
+    };
 
     const routes = [
-      { path: '/', component: Splash },
-      { path: '/login', component: Login },
+      { path: '/', component: Login },
       { path: '/logout', component: Logout },
       { path: '/register', component: Register },
       { path: '/profile', component: Profile },
+      { path: '/diet_plan', component: DietPlan },
+      { path: '/info', component: Information },
       // { path: '/edit', component: Edit },
     ];
 
     var router = new VueRouter({
       routes,
     });
+    router.beforeEach((to, from, next) => {
+      if(['/'].indexOf(to.path) < 0 && globalData.$data.$userObject == null) next({ path: '/' });
+      else next();
+    })
 
     var vm = new Vue({
       router,
