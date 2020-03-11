@@ -21,7 +21,9 @@
   </div>
 
   <script type="text/javascript" src="js/vue.min.js"></script>
+  <script type="text/javascript" src="js/vuex.js"></script>
   <script type="text/javascript" src="js/vue-router.min.js"></script>
+  <script type="text/javascript" src="js/lodash.min.js"></script>
   <script type="text/javascript" src="js/jquery-3.4.1.min.js"></script>
   <script type="text/javascript" src="js/moment.js"></script>
   <script type="text/javascript" src="js/popper.min.js"></script>
@@ -38,6 +40,7 @@
       lf: 'Low-fat (LF)',
     };
     const IF_FASTING_PERIOD_LENGTH = 16;
+    const IF_WEEKS_COLOR_PALETTE = ['#d6cbd3', '#eca1a6', '#bdcebe', '#ada397'];
 
     firebase.initializeApp({
       apiKey: 'AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ',
@@ -49,29 +52,48 @@
     var auth = firebase.auth();
     var db = firebase.firestore();
 
-    let globalData = new Vue({
-      data: {
-        $error: '',
-        $userObject: null,
-        $userDocument: null,
+    const store = new Vuex.Store({
+      state: {
+        error: '',
+        user: null,
+        doc: null,
+      },
+      mutations: {
+        setUser(state, user) {
+          state.user = user;
+        },
+        setDocument(state, doc) {
+          if(state.doc == null) return state.doc = doc;
+
+          _.debounce(function() {
+            $('.loadingModal').modal({
+              backdrop: 'static',
+              keyboard: false,
+              focus: false,
+            });
+
+            db.collection('users').doc(state.user.uid).set(doc)
+            .then(function() {
+              $('.loadingModal').modal('hide');
+            });
+          }, 1000)();
+        },
+      },
+      actions: {
+        fetchDocument({ commit, state }) {
+          return new Promise((resolve, reject) => {
+            db.collection('users').doc(state.user.uid).get()
+              .then((doc) => {
+                var data = doc.data();
+                if(typeof data === 'undefined') return;
+                commit('setDocument', data);
+                resolve();
+              })
+              .catch((error) => reject(error));
+          });
+        }
       },
     });
-
-    function updateUserDocument(doc, cb)
-    {
-      $('.loadingModal').modal({
-        backdrop: 'static',
-        keyboard: false,
-        focus: false,
-      });
-
-      db.collection('users').doc(globalData.$data.$userObject.uid).set(doc)
-      .then(function() {
-        globalData.$data.$userDocument = doc;
-        $('.loadingModal').modal('hide');
-        if(typeof cb === 'function') cb();
-      });
-    }
 
     const Login = {
       template: `
@@ -117,17 +139,6 @@
           auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
           .then(function() {
             auth.signInWithEmailAndPassword(that.username + USERNAME_SUFFIX, that.password)
-            .then(function(credential) {
-              globalData.$data.$userObject = credential.user;
-
-              db.collection('users').doc(credential.user.uid).get().then((doc) => {
-                that.loading = false;
-                var data = doc.data();
-                if(typeof data === 'undefined') return;
-
-                globalData.$data.$userDocument = data;
-              });
-            })
             .catch(function(error) {
               that.loading = false;
               that.error = error.message;
@@ -145,16 +156,9 @@
         this.loading = true;
         auth.onAuthStateChanged(function(user) {
           if(user) {
-            globalData.$data.$userObject = user;
-
-            db.collection('users').doc(user.uid).get().then((doc) => {
-              that.loading = false;
-              var data = doc.data();
-              if(typeof data === 'undefined') return;
-
-              globalData.$data.$userDocument = data;
-              router.push({ path: '/profile' });
-            });
+            store.commit('setUser', user);
+            store.dispatch('fetchDocument')
+              .then(() => router.push({ path: '/profile' }));
           } else that.loading = false;
         });
       },
@@ -172,12 +176,10 @@
       created: function() {
         auth.signOut()
         .then(function() {
-          globalData.$data.$userObject = null;
-          globalData.$data.$userDocument = null;
           router.push({ path: '/' });
         })
         .catch(function(error) {
-          console.log(error.message);
+          console.log(error);
         });
       },
     };
@@ -206,6 +208,7 @@
           .then(function(credential) {
 
             var user = credential.user;
+            store.commit('setUser', user);
 
             db.collection('users').doc(user.uid).set({
               name: that.name,
@@ -224,12 +227,14 @@
                 sat: 12,
                 sun: 12,
               },
+              if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
               start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
               update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
             })
             .then(function() {
               that.loading = false;
               that.success = true;
+              store.dispatch('fetchDocument');
             })
             .catch(function(error) {
               console.log(error);
@@ -364,8 +369,6 @@
       `,
       data: function() {
         return {
-          user: null,
-          doc: null,
           new_weight: 0,
         };
       },
@@ -403,10 +406,7 @@
         lastUpdated: function() {
           return moment.unix(this.doc.update_diet_on.seconds).format();
         },
-      },
-      created: function() {
-        this.user = globalData.$data.$userObject;
-        this.doc = globalData.$data.$userDocument;
+        ...Vuex.mapState(['user', 'doc']),
       },
       mounted: function() {
         if(moment().isSameOrAfter(moment.unix(this.doc.update_diet_on.seconds).add(7, 'days'))) {
@@ -552,16 +552,42 @@
           </div>
           <div class="row mt-3">
             <div class="w-100 overflow-auto">
-              <table class="table mb-0" ref="ifTable">
+              <table class="table mb-0 text-center">
                 <thead>
-                  <tr><th></th></tr>
+                  <tr>
+                    <th></th>
+                    <th v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                      {{ d.format('ddd') }}
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
-                  <tr><th>No eating</th></tr>
-                  <tr><th>No calories</th></tr>
+                  <tr>
+                    <th>No eating</th>
+                    <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                      <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" :id="'noEating' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick(i, 'no_eating')">
+                        <label class="custom-control-label" :for="'noEating' + i"></label>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>No calories</th>
+                    <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                      <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" :id="'noCalories' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick(i, 'no_calories')">
+                        <label class="custom-control-label" :for="'noCalories' + i"></label>
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
                 <tfoot>
-                  <tr><th></th></tr>
+                  <tr>
+                    <th></th>
+                    <td v-for="i in 3" colspan="7">
+                      <b>Week {{ i }}</b>
+                    </td>
+                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -593,16 +619,24 @@
       `,
       data: function() {
         return {
-          user: null,
-          doc: null,
+          twentyOneDays: [],
         };
       },
       created: function() {
-        this.user = globalData.$data.$userObject;
-        this.doc = globalData.$data.$userDocument;
+        this.twentyOneDays = Array(21).fill().map((n, i) => moment.unix(this.doc.start_diet_on.seconds).add(i, 'days'));
+      },
+      methods: {
+        ifTick: function(index, type) {
+          console.log(index, type);
+        },
+        shouldBeDisabled: function(d) {
+          return d.isSameOrBefore(moment(), 'day') ? false : true;
+        },
+      },
+      computed: {
+        ...Vuex.mapState(['user', 'doc']),
       },
       mounted: function() {
-
         if(this.doc.diet_plan == 'if')
         {
           var ctx = this.$refs['ifChart'].getContext('2d');
@@ -622,60 +656,7 @@
               maintainAspectRatio: false,
             },
           });
-
-          var table = $(this.$refs['ifTable']);
-          for(i = 0, d = moment.unix(this.doc.start_diet_on.seconds);
-              d.isBefore(moment.unix(this.doc.start_diet_on.seconds).add(21, 'days'));
-              i++, d.add(1, 'days'))
-          {
-            table.find('thead > tr').append(`
-              <th>${d.format('ddd')}</th>
-            `);
-            table.find('tbody > tr:eq(0)').append(`
-              <td>
-                <div class="custom-control custom-checkbox">
-                  <input type="checkbox" class="custom-control-input" id="noEating${i}" ${d.isSameOrBefore(moment(), 'day') ? '' : 'disabled'}>
-                  <label class="custom-control-label" for="noEating${i}"></label>
-                </div>
-              </td>
-            `);
-            table.find('tbody > tr:eq(1)').append(`
-              <td>
-                <div class="custom-control custom-checkbox">
-                  <input type="checkbox" class="custom-control-input" id="noCalories${i}" ${d.isSameOrBefore(moment(), 'day') ? '' : 'disabled'}>
-                  <label class="custom-control-label" for="noCalories${i}"></label>
-                </div>
-              </td>
-            `);
-
-            /* Week Separator */
-            if((i + 1) % 7 == 0)
-            {
-              table.find('thead > tr').append(`
-                <th></th>
-                <th></th>
-              `);
-              table.find('tbody > tr').append(`
-                <td></td>
-                <td></td>
-              `);
-              table.find('tfoot > tr').append(`
-                <td class="text-center" colspan="7"><b>Week ${Math.floor(i / 7)+ 1}</b></td>
-                <td></td>
-                <td></td>
-              `);
-            }
-          }
         }
-      },
-      watch: {
-        doc: {
-          handler(oldDoc, newDoc) {
-            if(oldDoc == null || newDoc == null) return;
-            updateUserDocument(newDoc);
-          },
-          deep: true,
-        },
       },
     };
     const Information = {
@@ -733,22 +714,18 @@
         </div>
       </div>
       `,
-      data: function() {
-        return {
-          user: null,
-          doc: null,
-        };
-      },
       methods: {
         decreaseHour: function(dow) {
           var newHour = this.doc.fasting_period[dow.toLowerCase()] - 1;
           if(newHour < 0) newHour = 23;
           this.doc.fasting_period[dow.toLowerCase()] = newHour;
+          store.commit('setDocument', this.doc);
         },
         increaseHour: function(dow) {
           var newHour = this.doc.fasting_period[dow.toLowerCase()] + 1;
           if(newHour > 23) newHour = 0;
           this.doc.fasting_period[dow.toLowerCase()] = newHour;
+          store.commit('setDocument', this.doc);
         },
         fastingPeriodStart: function(dow) {
           var start = this.doc.fasting_period[dow.toLowerCase()];
@@ -756,23 +733,11 @@
         },
         fastingPeriodEnd: function(dow) {
           var end = this.doc.fasting_period[dow.toLowerCase()] + (24 - IF_FASTING_PERIOD_LENGTH);
-          if(end > 23) end = 0;
+          if(end > 23) end -= 24;
           return end < 10 ? `0${end}` : `${end}`;
         },
       },
-      created: function() {
-        this.user = globalData.$data.$userObject;
-        this.doc = globalData.$data.$userDocument;
-      },
-      watch: {
-        doc: {
-          handler(oldDoc, newDoc) {
-            if(oldDoc == null || newDoc == null) return;
-            updateUserDocument(newDoc);
-          },
-          deep: true,
-        },
-      },
+      computed: Vuex.mapState(['user', 'doc']),
     };
 
     const routes = [
@@ -789,11 +754,12 @@
       routes,
     });
     router.beforeEach((to, from, next) => {
-      if(['/'].indexOf(to.path) < 0 && globalData.$data.$userObject == null) next({ path: '/' });
+      if(['/'].indexOf(to.path) < 0 && store.state.user == null) next({ path: '/' });
       else next();
     })
 
     var vm = new Vue({
+      store,
       router,
     })
     .$mount('#app');
