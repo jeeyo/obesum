@@ -39,6 +39,7 @@
       lc: 'Low-carb (LC)',
       lf: 'Low-fat (LF)',
     };
+    const LOADING_MODAL_STRING = 'Please wait while we are saving your information';
     const IF_FASTING_PERIOD_LENGTH = 16;
     const IF_WEEKS_COLOR_PALETTE = ['#d6cbd3', '#eca1a6', '#bdcebe', '#ada397'];
 
@@ -47,6 +48,7 @@
       authDomain: 'obesum-978f6.firebaseapp.com',
       projectId: 'obesum-978f6',
       appId: '1:758254882474:web:6c029dede9e22070658ad3',
+      databaseURL: "https://obesum-978f6.firebaseio.com",
     });
 
     var auth = firebase.auth();
@@ -57,6 +59,7 @@
         error: '',
         user: null,
         doc: null,
+        debouncer: null,
       },
       mutations: {
         setUser(state, user) {
@@ -65,7 +68,8 @@
         setDocument(state, doc) {
           if(state.doc == null) return state.doc = doc;
 
-          _.debounce(function() {
+          if(this.debouncer != null) this.debouncer.cancel();
+          this.debouncer = _.debounce(function() {
             $('.loadingModal').modal({
               backdrop: 'static',
               keyboard: false,
@@ -76,7 +80,8 @@
             .then(function() {
               $('.loadingModal').modal('hide');
             });
-          }, 1000)();
+          }, 200);
+          this.debouncer();
         },
       },
       actions: {
@@ -330,7 +335,7 @@
 
         <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
           <div class="container">
-            <nav class="nav nav-pills nav-fill">
+            <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link active" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
@@ -360,6 +365,10 @@
               <div class="modal-body text-center">
                 <div class="spinner-border" role="status">
                   <span class="sr-only">Loading...</span>
+                </div>
+                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
+                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
+                  {{ store.state.error }}
                 </div>
               </div>
             </div>
@@ -418,96 +427,6 @@
         }
       },
     };
-    // const Edit = {
-    //   data: function() {
-    //     return {
-    //       username: '',
-    //       password: '',
-    //       name: '',
-    //       age: 25,
-    //       gender: 'm',
-    //       height: 160,
-    //       weight: 60,
-    //       loading: false,
-    //       success: false,
-    //       error: '',
-    //     };
-    //   },
-    //   methods: {
-    //     edit: function() {
-    //       var that = this;
-    //       this.loading = true;
-
-    //       // db.collection('users').doc(user.uid).set({
-    //       //   name: that.name,
-    //       //   age: parseInt(that.age),
-    //       //   gender: that.gender,
-    //       //   height: parseInt(that.height),
-    //       //   weight: parseInt(that.weight),
-    //       //   diet_plan: 'blank',
-    //       //   update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
-    //       // })
-    //       // .then(function() {
-    //       //   that.loading = false;
-    //       //   that.success = true;
-    //       // })
-    //       // .catch(function(error) {
-    //       //   console.log(error);
-    //       //   that.loading = false;
-    //       //   that.error = error.message;
-    //       // });
-    //       return false;
-    //     },
-    //   },
-    //   template: `
-    //   <div>
-    //     <h1 class="mb-5">Edit</h1 class="mb-5">
-    //     <div class="alert alert-success" role="alert" v-show="success">
-    //       Your profile information has been saved.
-    //     </div>
-    //     <div class="alert alert-danger" role="alert" v-show="error">
-    //       {{ error }}
-    //     </div>
-    //     <form v-on:submit="edit">
-    //       <div class="form-group">
-    //         <label for="edit-username">Username</label>
-    //         <input type="text" class="form-control" id="edit-username" v-model="username">
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-password">Password</label>
-    //         <input type="password" class="form-control" id="edit-password" v-model="password">
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-name">Name</label>
-    //         <input type="text" class="form-control" id="edit-name" v-model="name">
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-password">Age</label>
-    //         <input type="number" class="form-control" id="edit-age" v-model="age">
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-gender">Gender</label>
-    //         <select id="edit-gender">
-    //           <option value="m">Male</option>
-    //           <option value="f">Female</option>
-    //         </select>
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-height">Height</label>
-    //         <input type="number" class="form-control" id="edit-height" v-model="height">
-    //       </div>
-    //       <div class="form-group">
-    //         <label for="edit-weight">Weight</label>
-    //         <input type="number" class="form-control" id="edit-weight" v-model="weight">
-    //       </div>
-    //       <button type="submit" class="btn btn-primary">Edit</button>
-    //       <img src="images/spinner.gif" v-show="loading">
-    //     </form>
-
-    //     <router-link to="/profile">Cancel</router-link>
-    //   </div>
-    //   `,
-    // };
     const DietPlan = {
       template: `
       <div>
@@ -566,8 +485,8 @@
                     <th>No eating</th>
                     <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
                       <div class="custom-control custom-checkbox">
-                        <input type="checkbox" class="custom-control-input" :id="'noEating' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick(i, 'no_eating')">
-                        <label class="custom-control-label" :for="'noEating' + i"></label>
+                        <input type="checkbox" class="custom-control-input" :id="'no_eating-' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick" v-model="doc.if_checks[i]['no_eating']">
+                        <label class="custom-control-label" :for="'no_eating-' + i"></label>
                       </div>
                     </td>
                   </tr>
@@ -575,8 +494,8 @@
                     <th>No calories</th>
                     <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
                       <div class="custom-control custom-checkbox">
-                        <input type="checkbox" class="custom-control-input" :id="'noCalories' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick(i, 'no_calories')">
-                        <label class="custom-control-label" :for="'noCalories' + i"></label>
+                        <input type="checkbox" class="custom-control-input" :id="'no_calories-' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick" v-model="doc.if_checks[i]['no_calories']">
+                        <label class="custom-control-label" :for="'no_calories-' + i"></label>
                       </div>
                     </td>
                   </tr>
@@ -596,7 +515,7 @@
 
         <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
           <div class="container">
-            <nav class="nav nav-pills nav-fill">
+            <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link active" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
@@ -610,6 +529,10 @@
               <div class="modal-body text-center">
                 <div class="spinner-border" role="status">
                   <span class="sr-only">Loading...</span>
+                </div>
+                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
+                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
+                  {{ store.state.error }}
                 </div>
               </div>
             </div>
@@ -626,8 +549,8 @@
         this.twentyOneDays = Array(21).fill().map((n, i) => moment.unix(this.doc.start_diet_on.seconds).add(i, 'days'));
       },
       methods: {
-        ifTick: function(index, type) {
-          console.log(index, type);
+        ifTick: function(evt) {
+          store.commit('setDocument', this.doc);
         },
         shouldBeDisabled: function(d) {
           return d.isSameOrBefore(moment(), 'day') ? false : true;
@@ -676,7 +599,7 @@
                     <span aria-hidden="true">&laquo;</span>
                   </a>
                 </li>
-                <li class="page-item">
+                <li class="page-item disabled">
                   <a class="page-link" href="#">
                     {{ fastingPeriodStart(dow) }}.00 - {{ fastingPeriodEnd(dow) }}.00
                   </a>
@@ -693,7 +616,7 @@
 
         <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
           <div class="container">
-            <nav class="nav nav-pills nav-fill">
+            <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link active" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
@@ -708,6 +631,10 @@
                 <div class="spinner-border" role="status">
                   <span class="sr-only">Loading...</span>
                 </div>
+                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
+                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
+                  {{ store.state.error }}
+                </div>
               </div>
             </div>
           </div>
@@ -720,12 +647,14 @@
           if(newHour < 0) newHour = 23;
           this.doc.fasting_period[dow.toLowerCase()] = newHour;
           store.commit('setDocument', this.doc);
+          return false;
         },
         increaseHour: function(dow) {
           var newHour = this.doc.fasting_period[dow.toLowerCase()] + 1;
           if(newHour > 23) newHour = 0;
           this.doc.fasting_period[dow.toLowerCase()] = newHour;
           store.commit('setDocument', this.doc);
+          return false;
         },
         fastingPeriodStart: function(dow) {
           var start = this.doc.fasting_period[dow.toLowerCase()];
@@ -747,7 +676,6 @@
       { path: '/profile', component: Profile },
       { path: '/diet_plan', component: DietPlan },
       { path: '/info', component: Information },
-      // { path: '/edit', component: Edit },
     ];
 
     var router = new VueRouter({
