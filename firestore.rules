@@ -4,5 +4,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow create, read, update, delete: if request.auth.uid == userId;
     }
+    match /feedbacks/{feedbackId} {
+      allow create: if request.auth.uid != null;
+    }
   }
 }

@@ -24,9 +24,9 @@
   <script type="text/javascript" src="js/vuex.js"></script>
   <script type="text/javascript" src="js/vue-router.min.js"></script>
   <script type="text/javascript" src="js/lodash.min.js"></script>
-  <script type="text/javascript" src="js/jquery-3.4.1.min.js"></script>
   <script type="text/javascript" src="js/moment.js"></script>
   <script type="text/javascript" src="js/popper.min.js"></script>
+  <script type="text/javascript" src="js/jquery-3.4.1.min.js"></script>
   <script type="text/javascript" src="js/bootstrap.min.js"></script>
   <script type="text/javascript" src="js/Chart.bundle.min.js"></script>
 
@@ -109,7 +109,10 @@
           </div>
         </div>
         <div v-else>
-          <h1 class="mb-5">Login</h1 class="mb-5">
+          <div class="mb-5 text-center">
+            <img src="img/PNG1.png" style="width: 300px; height: 300px;">
+            <h1>Login</h1>
+          </div>
           <div class="alert alert-danger" role="alert" v-show="error">
             {{ error }}
           </div>
@@ -122,8 +125,12 @@
               <label for="login-password">Password</label>
               <input type="password" class="form-control" id="login-password" v-model="password">
             </div>
-            <button class="btn btn-primary">Login</button>
-            <router-link to="/register">Register a new account</router-link>
+            <div class="form-group">
+              <button class="btn btn-primary">Login</button>
+            </div>
+            <div class="form-group">
+              <router-link to="/register">Register a new account</router-link>
+            </div>
           </form>
         </div>
       </div>
@@ -172,7 +179,7 @@
     const Logout = {
       template: `
       <div>
-        <h1 class="mb-5">Logging out...</h1 class="mb-5">
+        <h1 class="mb-5">Logging out...</h1>
         <div class="spinner-border" role="status">
           <span class="sr-only">Loading...</span>
         </div>
@@ -256,10 +263,16 @@
       },
       template: `
       <div>
-        <h1 class="mb-5">Register</h1 class="mb-5">
+          <div class="mb-5 text-center">
+            <img src="img/PNG2.png" style="width: 300px; height: 300px;">
+            <h1>Register</h1>
+          </div>
+          <div class="alert alert-danger" role="alert" v-show="error">
+            {{ error }}
+          </div>
         <div class="alert alert-success" role="alert" v-show="success">
           Your account has been registered.
-          <router-link to="/login">Login</router-link>
+          <router-link to="/">Login</router-link>
         </div>
         <div class="alert alert-danger" role="alert" v-show="error">
           {{ error }}
@@ -296,40 +309,48 @@
             <label for="register-weight">Weight</label>
             <input type="number" class="form-control" id="register-weight" v-model="weight">
           </div>
-          <button class="btn btn-primary">Register</button>
-          <div class="spinner-border" role="status" v-show="loading">
-            <span class="sr-only">Loading...</span>
+          <div class="form-group">
+            <button class="btn btn-primary">Register</button>
+            <div class="spinner-border" role="status" v-show="loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <router-link to="/">Already have an account? Login</router-link>
           </div>
         </form>
-
-        <router-link to="/login">Already have an account? Login</router-link>
       </div>
       `,
     };
     const Profile = {
       template: `
       <div>
-        <h1 class="mb-5">Profile</h1 class="mb-5">
+        <div class="mb-5">
+          <h1>Your profile</h1>
+          <p><router-link to="/logout">Logout</router-link></p>
+        </div>
+        <div class="border rounded-circle text-center text-uppercase" style="float: right; width: 300px; height: 300px; font-size: 80px; padding-top: 85px;">
+          {{ this.doc.diet_plan }}
+        </div>
         <div style="margin-bottom: 100px;">
           <div class="row">
-            <div class="col-sm-4">
-              <h3>{{ username }}</h3>
-            </div>
+            <h3>Your BMI</h3>
           </div>
           <div class="row">
-            <div class="col-sm-4"><h3>Start BMI</h3></div>
+            <div class="col-sm-4"><h4>Start</h4></div>
             <div class="col-sm">{{ startBMI }}</div>
           </div>
           <div class="row">
-            <div class="col-sm-4"><h3>Current BMI</h3></div>
-            <div class="col-sm">{{ currentBMI }}</div>
+            <div class="col-sm-4"><h4>Week 1</h4></div>
+            <div class="col-sm">{{ this.doc.bmi[0] }}</div>
           </div>
           <div class="row">
-            <div class="col-sm-4"><h3>Your option</h3></div>
-            <div class="col-sm">{{ dietPlan }}</div>
+            <div class="col-sm-4"><h4>Week 2</h4></div>
+            <div class="col-sm">{{ this.doc.bmi[1] }}</div>
           </div>
           <div class="row">
-            <div class="col-sm-4"><router-link to="/logout">Logout</router-link></div>
+            <div class="col-sm-4"><h4>Week 3</h4></div>
+            <div class="col-sm">{{ this.doc.bmi[2] }}</div>
           </div>
         </div>
 
@@ -359,6 +380,22 @@
           </div>
         </div>
 
+        <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" ref="feedbackModal">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-body text-center">
+                <div class="form-group">
+                  <label for="feedback"><b>Feedback</b></label>
+                  <input type="number" class="form-control" id="feedback" v-model="feedback">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-primary" v-on:click="submitFeedback">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -379,6 +416,7 @@
       data: function() {
         return {
           new_weight: 0,
+          feedback: '',
         };
       },
       methods: {
@@ -391,9 +429,52 @@
           this.doc.bmi[newBMIIndex] = Math.round((bmi + Number.EPSILON) * 100) / 100;
 
           this.doc.update_diet_on = firebase.firestore.FieldValue.serverTimestamp(),
-          updateUserDocument(this.doc, function() {
-            $(that.$refs['weightModal']).modal('hide');
+          store.commit('setDocument', this.doc);
+          $(that.$refs['weightModal']).modal('hide');
+          
+          if(moment().isSameOrAfter(moment.unix(this.doc.start_diet_on.seconds).add(21, 'days'))) {
+            $(this.$refs['feedbackModal']).modal({
+              backdrop: 'static',
+              keyboard: false,
+              focus: false,
+            });
+          }
+        },
+        submitFeedback: function() {
+          var that = this;
+          $('.loadingModal').modal({
+            backdrop: 'static',
+            keyboard: false,
+            focus: false,
           });
+
+          db.collection('feedbacks').add({
+            doc: that.doc,
+            user: that.user,
+            feedback: that.feedback,
+          })
+            .then(function() {
+              db.collection('users').doc(user.uid).set({
+                weight: parseInt(that.new_weight),
+                diet_plan: 'blank',
+                bmi: [0, 0, 0],
+                fasting_period: {
+                  mon: 12,
+                  tue: 12,
+                  wed: 12,
+                  thu: 12,
+                  fri: 12,
+                  sat: 12,
+                  sun: 12,
+                },
+                if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
+                start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+                update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+              })
+                .then(function() {
+                  $(that.$refs['feedbackModal']).modal('hide');
+                });
+            });
         },
       },
       computed: {
@@ -430,7 +511,7 @@
     const DietPlan = {
       template: `
       <div>
-        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }}</h1 class="mb-5">
+        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }}</h1>
         <div v-if="doc.diet_plan == 'blank'">
           <div class="card-deck">
             <div class="card">
@@ -482,8 +563,11 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <th>No eating</th>
-                    <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                    <th style="white-space: nowrap;">
+                      <div>ไม่ได้กิน</div>
+                      <div>ไรใช่ไหม</div>
+                    </th>
+                    <td class="align-middle" v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
                       <div class="custom-control custom-checkbox">
                         <input type="checkbox" class="custom-control-input" :id="'no_eating-' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick" v-model="doc.if_checks[i]['no_eating']">
                         <label class="custom-control-label" :for="'no_eating-' + i"></label>
@@ -491,8 +575,14 @@
                     </td>
                   </tr>
                   <tr>
-                    <th>No calories</th>
-                    <td v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                    <th style="white-space: nowrap;">
+                      <div>ตอน fasting</div>
+                      <div>กินน้ำไม่มี cal ยัง</div>
+                      <div>
+                        <a href="#" ref="whyDrinkWhileFasting" data-toggle="tooltip" data-placement="bottom" title="ถ้าไม่กินน้ำระหว่าง fasting จะทรมานมากนะ" onclick="return false;">Why?</a>
+                      </div>
+                    </th>
+                    <td class="align-middle" v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
                       <div class="custom-control custom-checkbox">
                         <input type="checkbox" class="custom-control-input" :id="'no_calories-' + i" :disabled="shouldBeDisabled(d)" v-on:change="ifTick" v-model="doc.if_checks[i]['no_calories']">
                         <label class="custom-control-label" :for="'no_calories-' + i"></label>
@@ -562,6 +652,8 @@
       mounted: function() {
         if(this.doc.diet_plan == 'if')
         {
+          $(this.$refs['whyDrinkWhileFasting']).tooltip();
+
           var ctx = this.$refs['ifChart'].getContext('2d');
           var myDoughnutChart = new Chart(ctx, {
             type: 'doughnut',
@@ -585,7 +677,7 @@
     const Information = {
       template: `
       <div>
-        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }} Information</h1 class="mb-5">
+        <h1 class="mb-5">{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }} Information</h1>
 
         <div style="margin-bottom: 100px;" v-if="doc.diet_plan == 'if'">
           <div class="row" v-for="dow in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="dow">
@@ -611,6 +703,13 @@
                 </li>
               </ul>
             </div>
+          </div>
+          <div class="row">
+            คุณจะรู้สึกหิวจนท้องแสบ....ถ้า
+            <ul>
+              <li>exercise ตอน fasting จะหิวกว่าเดิม</li>
+              <li>กินอาหารไม่มีประโยชน์ เช่น junk food</li>
+            </ul>
           </div>
         </div>
 
@@ -682,7 +781,7 @@
       routes,
     });
     router.beforeEach((to, from, next) => {
-      if(['/'].indexOf(to.path) < 0 && store.state.user == null) next({ path: '/' });
+      if(['/', '/register'].indexOf(to.path) < 0 && store.state.user == null) next({ path: '/' });
       else next();
     })
 
