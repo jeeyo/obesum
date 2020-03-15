@@ -18,6 +18,23 @@
 <body>
   <div id="app" class="container pt-3">
     <router-view></router-view>
+    
+    <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true" ref="loadingModal">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="spinner-border" role="status">
+              <span class="sr-only">Loading...</span>
+            </div>
+            <div><b>{{ LOADING_MODAL_STRING }}</b></div>
+            <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
+              {{ store.state.error }}
+            </div>
+            <div class="alert alert-warning mt-3 mb-0" role="alert">If this is taking too long, please click <a href="#" onclick="location.reload()">here</a> to refresh</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="text/javascript" src="js/vue.min.js"></script>
@@ -40,8 +57,30 @@
       lf: 'Low-fat (LF)',
     };
     const LOADING_MODAL_STRING = 'Please wait while we are saving your information';
+    const DEFAULT_DOC = {
+      diet_plan: 'blank',
+      bmi: [0, 0, 0],
+      fasting_period: {
+        mon: 12,
+        tue: 12,
+        wed: 12,
+        thu: 12,
+        fri: 12,
+        sat: 12,
+        sun: 12,
+      },
+      if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
+      lc_checks: Array(21).fill().map(n => { return { unsaturated_fat_0: '', unsaturated_fat_1: '', saturated_fat: '', protein: '' }; }),
+      lf_checks: Array(21).fill().map(n => { return { carb_with_fiber: '', unsaturated_fat: '', protein: '' }; }),
+      start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+      update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+    };
     const IF_FASTING_PERIOD_LENGTH = 16;
     const IF_WEEKS_COLOR_PALETTE = ['#d6cbd3', '#eca1a6', '#bdcebe', '#ada397'];
+    const LC_LF_UNSATURED_FAT_RECIPES = ['ชีส', 'ครีมชีส', 'อโวคาโด', 'แมกคาดิเมีย', 'แอลมอน', 'น้ำมันมะพร้าว', 'กรีซ โยเกริต์'];
+    const LC_SATURED_FAT_RECIPES = ['หมูสามชั้น', 'ขาหมู', 'เบคอน'];
+    const LC_LF_PROTEIN_RECIPES = ['ไข่', 'นม', 'แฮม', 'เนื้อหมู', 'เนื้อไก่', 'ซีฟู้ด', 'เครื่องในสัตว์', 'เครื่องในสัตว์', 'เต้าหู้', 'ถั่ว'];
+    const LF_CARB_WITH_FIBER_RECIPES = ['ข้าวโพด', 'ผลไม้', 'ข้าวกล้อง', 'มันม่วง', 'ขนมปังธัญพืช'];
 
     firebase.initializeApp({
       apiKey: 'AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ',
@@ -110,7 +149,7 @@
         </div>
         <div v-else>
           <div class="mb-5 text-center">
-            <img src="img/PNG1.png" style="width: 300px; height: 300px;">
+            <img src="img/splash_logo.png" style="width: 300px; height: 300px;">
             <h1>Login</h1>
           </div>
           <div class="alert alert-danger" role="alert" v-show="error">
@@ -197,74 +236,10 @@
     };
 
     const Register = {
-      data: function() {
-        return {
-          username: '',
-          password: '',
-          name: '',
-          age: 25,
-          gender: 'm',
-          height: 160,
-          weight: 60,
-          loading: false,
-          success: false,
-          error: '',
-        };
-      },
-      methods: {
-        register: function() {
-          var that = this;
-          this.loading = true;
-
-          auth.createUserWithEmailAndPassword(this.username + '@obesum.xyz', this.password)
-          .then(function(credential) {
-
-            var user = credential.user;
-            store.commit('setUser', user);
-
-            db.collection('users').doc(user.uid).set({
-              name: that.name,
-              age: parseInt(that.age),
-              gender: that.gender,
-              height: parseInt(that.height),
-              weight: parseInt(that.weight),
-              diet_plan: 'blank',
-              bmi: [0, 0, 0],
-              fasting_period: {
-                mon: 12,
-                tue: 12,
-                wed: 12,
-                thu: 12,
-                fri: 12,
-                sat: 12,
-                sun: 12,
-              },
-              if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
-              start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
-              update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
-            })
-            .then(function() {
-              that.loading = false;
-              that.success = true;
-              store.dispatch('fetchDocument');
-            })
-            .catch(function(error) {
-              console.log(error);
-              that.loading = false;
-              that.error = error.message;
-            });
-          })
-          .catch(function(error) {
-            that.loading = false;
-            that.error = error.message;
-          });
-          return false;
-        },
-      },
       template: `
       <div>
           <div class="mb-5 text-center">
-            <img src="img/PNG2.png" style="width: 300px; height: 300px;">
+            <img src="img/thanks.png" style="width: 300px; height: 300px;">
             <h1>Register</h1>
           </div>
           <div class="alert alert-danger" role="alert" v-show="error">
@@ -321,13 +296,66 @@
         </form>
       </div>
       `,
+      data: function() {
+        return {
+          username: '',
+          password: '',
+          name: '',
+          age: 25,
+          gender: 'm',
+          height: 160,
+          weight: 60,
+          loading: false,
+          success: false,
+          error: '',
+        };
+      },
+      methods: {
+        register: function() {
+          var that = this;
+          this.loading = true;
+
+          auth.createUserWithEmailAndPassword(this.username + '@obesum.xyz', this.password)
+          .then(function(credential) {
+
+            var user = credential.user;
+            store.commit('setUser', user);
+
+            db.collection('users').doc(user.uid).set({
+              ...{
+                name: that.name,
+                age: parseInt(that.age),
+                gender: that.gender,
+                height: parseInt(that.height),
+                weight: parseInt(that.weight),
+              },
+              ...DEFAULT_DOC,
+            })
+            .then(function() {
+              that.loading = false;
+              that.success = true;
+              store.dispatch('fetchDocument');
+            })
+            .catch(function(error) {
+              console.log(error);
+              that.loading = false;
+              that.error = error.message;
+            });
+          })
+          .catch(function(error) {
+            that.loading = false;
+            that.error = error.message;
+          });
+          return false;
+        },
+      },
     };
+
     const Profile = {
       template: `
       <div>
         <div class="mb-5">
           <h1>Your profile</h1>
-          <p><router-link to="/logout">Logout</router-link></p>
         </div>
         <div class="border rounded-circle text-center text-uppercase" style="float: right; width: 300px; height: 300px; font-size: 80px; padding-top: 85px;">
           {{ this.doc.diet_plan }}
@@ -360,6 +388,7 @@
               <router-link class="nav-item nav-link active" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+              <router-link class="nav-item nav-link" to="/settings">Settings</router-link>
             </nav>
           </div>
         </div>
@@ -380,33 +409,17 @@
           </div>
         </div>
 
-        <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" ref="feedbackModal">
+        <div class="modal fade feedbackModal" tabindex="-1" role="dialog" aria-hidden="true" ref="feedbackModal">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
               <div class="modal-body text-center">
                 <div class="form-group">
                   <label for="feedback"><b>Feedback</b></label>
-                  <input type="number" class="form-control" id="feedback" v-model="feedback">
+                  <textarea class="form-control" id="feedback" rows="3" v-model="feedback"></textarea>
                 </div>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-primary" v-on:click="submitFeedback">Submit</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-              <div class="modal-body text-center">
-                <div class="spinner-border" role="status">
-                  <span class="sr-only">Loading...</span>
-                </div>
-                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
-                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
-                  {{ store.state.error }}
-                </div>
               </div>
             </div>
           </div>
@@ -431,7 +444,7 @@
           this.doc.update_diet_on = firebase.firestore.FieldValue.serverTimestamp(),
           store.commit('setDocument', this.doc);
           $(that.$refs['weightModal']).modal('hide');
-          
+
           if(moment().isSameOrAfter(moment.unix(this.doc.start_diet_on.seconds).add(21, 'days'))) {
             $(this.$refs['feedbackModal']).modal({
               backdrop: 'static',
@@ -442,7 +455,7 @@
         },
         submitFeedback: function() {
           var that = this;
-          $('.loadingModal').modal({
+          $(this.$refs['loadingModal']).modal({
             backdrop: 'static',
             keyboard: false,
             focus: false,
@@ -450,29 +463,25 @@
 
           db.collection('feedbacks').add({
             doc: that.doc,
-            user: that.user,
+            user: {
+              uid: that.user.uid,
+              username: that.username,
+            },
             feedback: that.feedback,
+            submitted_on: firebase.firestore.FieldValue.serverTimestamp(),
           })
             .then(function() {
-              db.collection('users').doc(user.uid).set({
-                weight: parseInt(that.new_weight),
-                diet_plan: 'blank',
-                bmi: [0, 0, 0],
-                fasting_period: {
-                  mon: 12,
-                  tue: 12,
-                  wed: 12,
-                  thu: 12,
-                  fri: 12,
-                  sat: 12,
-                  sun: 12,
+              db.collection('users').doc(that.user.uid).update({
+                ...{
+                  weight: parseInt(that.new_weight),
                 },
-                if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
-                start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
-                update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
+                ...DEFAULT_DOC,
               })
                 .then(function() {
-                  $(that.$refs['feedbackModal']).modal('hide');
+                  store.dispatch('fetchDocument').then(function() {
+                    $(that.$refs['feedbackModal']).modal('hide');
+                    $(that.$refs['loadingModal']).modal('hide');
+                  });
                 });
             });
         },
@@ -508,6 +517,7 @@
         }
       },
     };
+
     const DietPlan = {
       template: `
       <div>
@@ -520,7 +530,7 @@
                 <p class="card-text">การกินแบบจำกัดช่วงเวลา ซึ่งมีช่วงที่กินได้ [eating] กับ กินไม่ได้ [fasting] จะทำให้การเผาผลาญเปลี่ยนไป</p>
               </div>
               <div class="card-footer">
-                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'if'">Select</a>
+                <a href="#" class="btn btn-primary" v-on:click="dietPlanSelect('if')">Select</a>
               </div>
             </div>
 
@@ -530,7 +540,7 @@
                 <p class="card-text">การกินอาหารแบบกินคาร์โบไฮเดรตให้น้อยลง แต่อาจจะกินไขมันมากขึ้นแทน (ketogenic)</p>
               </div>
               <div class="card-footer">
-                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'lc'">Select</a>
+                <a href="#" class="btn btn-primary" v-on:click="dietPlanSelect('lc')">Select</a>
               </div>
             </div>
 
@@ -540,7 +550,7 @@
                 <p class="card-text">รูปแบบการกินที่เรากินไขมันให้น้อย แต่กินคาร์โบไฮเดรตที่มีไฟเบอร์เยอะขึ้น</p>
               </div>
               <div class="card-footer">
-                <a href="#" class="btn btn-primary" v-on:click="doc.diet_plan = 'lf'">Select</a>
+                <a href="#" class="btn btn-primary" v-on:click="dietPlanSelect('lf')">Select</a>
               </div>
             </div>
           </div>
@@ -552,7 +562,7 @@
           </div>
           <div class="row mt-3">
             <div class="w-100 overflow-auto">
-              <table class="table mb-0 text-center">
+              <table class="table table-bordered mb-0 text-center">
                 <thead>
                   <tr>
                     <th></th>
@@ -593,11 +603,100 @@
                 <tfoot>
                   <tr>
                     <th></th>
-                    <td v-for="i in 3" colspan="7">
+                    <td class="align-middle" v-for="i in 3" colspan="7">
                       <b>Week {{ i }}</b>
                     </td>
                   </tr>
                 </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 100px;" v-else-if="doc.diet_plan == 'lc'">
+          <div class="row mt-3">
+            <div class="w-100 overflow-auto">
+              <table class="table table-bordered mb-0 text-center">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th></th>
+                    <th>Unsaturated Fat (52.5%)</th>
+                    <th>Saturated Fat (12.5%)</th>
+                    <th>Protein (20%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                    <td class="align-middle" rowspan="7" v-if="i % 7 == 0">
+                      <div style="transform: rotate(270deg);"><b>Week {{ (i / 7) + 1 }}</b></div>
+                    </td>
+                    <th class="align-middle">
+                      {{ d.format('ddd') }}
+                    </th>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_UNSATURED_FAT_RECIPES, i , 'unsaturated_fat_0')">
+                        {{ doc.lc_checks[i]['unsaturated_fat_0'] == '' ? 'Add' : doc.lc_checks[i]['unsaturated_fat_0'] }}
+                      </button>
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_UNSATURED_FAT_RECIPES, i , 'unsaturated_fat_1')">
+                        {{ doc.lc_checks[i]['unsaturated_fat_1'] == '' ? 'Add' : doc.lc_checks[i]['unsaturated_fat_1'] }}
+                      </button>
+                    </td>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_SATURED_FAT_RECIPES, i, 'saturated_fat')">
+                        {{ doc.lc_checks[i]['saturated_fat'] == '' ? 'Add' : doc.lc_checks[i]['saturated_fat'] }}
+                      </button>
+                    </td>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_PROTEIN_RECIPES, i, 'protein')">
+                        {{ doc.lc_checks[i]['protein'] == '' ? 'Add' : doc.lc_checks[i]['protein'] }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 100px;" v-else-if="doc.diet_plan == 'lf'">
+          <div class="row mt-3">
+            <div class="w-100 overflow-auto">
+              <table class="table table-bordered mb-0 text-center">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th></th>
+                    <th>Carb with fiber (60%)</th>
+                    <th>Unsaturated Fat (20%)</th>
+                    <th>Protein (20%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
+                    <td class="align-middle" rowspan="7" v-if="i % 7 == 0">
+                      <div style="transform: rotate(270deg);"><b>Week {{ (i / 7) + 1 }}</b></div>
+                    </td>
+                    <th class="align-middle">
+                      {{ d.format('ddd') }}
+                    </th>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LF_CARB_WITH_FIBER_RECIPES, i , 'carb_with_fiber')">
+                        {{ doc.lf_checks[i]['carb_with_fiber'] == '' ? 'Add' : doc.lf_checks[i]['carb_with_fiber'] }}
+                      </button>
+                    </td>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_UNSATURED_FAT_RECIPES, i, 'unsaturated_fat')">
+                        {{ doc.lf_checks[i]['unsaturated_fat'] == '' ? 'Add' : doc.lf_checks[i]['unsaturated_fat'] }}
+                      </button>
+                    </td>
+                    <td class="align-middle">
+                      <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_PROTEIN_RECIPES, i, 'protein')">
+                        {{ doc.lf_checks[i]['protein'] == '' ? 'Add' : doc.lf_checks[i]['protein'] }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -609,21 +708,25 @@
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link active" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+              <router-link class="nav-item nav-link" to="/settings">Settings</router-link>
             </nav>
           </div>
         </div>
 
-        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal fade recipeModal" tabindex="-1" role="dialog" aria-hidden="true" ref="recipeModal">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
-              <div class="modal-body text-center">
-                <div class="spinner-border" role="status">
-                  <span class="sr-only">Loading...</span>
+              <div class="modal-body list-group">
+                <a href="#" v-for="recipe in lc_lf_recipes" class="list-group-item list-group-item-action" v-on:click="lcLfConfirmRecipe(recipe)">{{ recipe }}</a>
+                <div class="list-group-item">
+                  <div class="input-group">
+                    <input type="text" class="form-control" placeholder="พิมพ์ชื่ออาหารที่คุณต้องการได้เลย" v-model="lc_lf_custom_recipe">
+                    <div class="input-group-append">
+                      <button class="btn btn-outline-secondary" type="button" v-on:click="lcLfConfirmRecipe(lc_lf_custom_recipe)">บันทึก</button>
+                    </div>
+                  </div>
                 </div>
-                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
-                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
-                  {{ store.state.error }}
-                </div>
+                <a href="#" class="list-group-item list-group-item-action" v-on:click="lcLfConfirmRecipe('')"><b>เอาออก</b></a>
               </div>
             </div>
           </div>
@@ -633,14 +736,39 @@
       data: function() {
         return {
           twentyOneDays: [],
+          lc_lf_recipes: [],
+          lc_lf_eat_info: [0, ''],
+          lc_lf_custom_recipe: '',
         };
       },
       created: function() {
         this.twentyOneDays = Array(21).fill().map((n, i) => moment.unix(this.doc.start_diet_on.seconds).add(i, 'days'));
       },
       methods: {
-        ifTick: function(evt) {
+        dietPlanSelect: function(dp) {
+          this.doc.diet_plan = dp;
           store.commit('setDocument', this.doc);
+        },
+        ifTick: function() {
+          store.commit('setDocument', this.doc);
+        },
+        lcLfShowRecipeModal: function(recipes, idx, type) {
+          this.lc_lf_eat_info = [idx, type];
+          this.lc_lf_recipes = recipes;
+          this.lc_lf_custom_recipe = '';
+          $(this.$refs['recipeModal']).modal();
+        },
+        lcLfConfirmRecipe: function(recipe) {
+          let idx = this.lc_lf_eat_info[0];
+          let type = this.lc_lf_eat_info[1];
+
+          if(this.doc.diet_plan == 'lc')
+            this.doc.lc_checks[idx][type] = recipe;
+          else if(this.doc.diet_plan == 'lf')
+            this.doc.lf_checks[idx][type] = recipe;
+
+          store.commit('setDocument', this.doc);
+          $(this.$refs['recipeModal']).modal('hide');
         },
         shouldBeDisabled: function(d) {
           return d.isSameOrBefore(moment(), 'day') ? false : true;
@@ -674,6 +802,7 @@
         }
       },
     };
+
     const Information = {
       template: `
       <div>
@@ -713,29 +842,106 @@
           </div>
         </div>
 
+        <div style="margin-bottom: 100px;" v-if="doc.diet_plan == 'lc'">
+          <div style="margin-bottom: 50px;">
+            <div class="row">
+              <h3>Side effects</h3>
+            </div>
+            <div class="row">
+              <div class="col-sm-3 text-center">
+                <img style="width: 150px;" src="img/lc_urticaria.png">
+              </div>
+              <div class="col-sm-3 text-center">
+                <img style="width: 150px;" src="img/lc_nausea.png">
+              </div>
+              <div class="col-sm-3 text-center">
+                <img style="width: 150px;" src="img/lc_dizziness.png">
+              </div>
+              <div class="col-sm-3 text-center">
+                <img style="width: 150px;" src="img/lc_highstrung.png">
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-3 text-center">ผื่นแดง</div>
+              <div class="col-sm-3 text-center">คลื่นไส้</div>
+              <div class="col-sm-3 text-center">วิงเวียนศีรษะ</div>
+              <div class="col-sm-3 text-center">หงุดหงิดง่าย</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 50px;">
+            <div class="row">
+              <h3>กลุ่มอาหารที่ต้อง<u class="text-danger">เลี่ยง</u>เพื่อให้น้ำหนักดีขึ้น</h3>
+            </div>
+            <div class="row">
+              <div class="col-sm-3">
+                <ul>
+                  <li>เครื่องดื่มแอลกอฮอล์</li>
+                  <li>คาเฟอีน</li>
+                  <li>ซอสทั่วไป</li>
+                </ul>
+              </div>
+              <div class="col-sm-3">
+                ผักที่มีคาร์โบไฮเดรต เช่น
+                <ul>
+                  <li>เห็ด</li>
+                  <li>กระเทียม</li>
+                  <li>มะเขือเทศ</li>
+                  <li>ฝัก</li>
+                </ul>
+              </div>
+              <div class="col-sm-3">
+                ชีส
+                <ul>
+                  <li>Brick cheese</li>
+                  <li>Mozzarella cheese</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 50px;">
+            <div class="row">
+              <h3>เพิ่มพลัง Keto</h3>
+            </div>
+            <div class="row">
+              <div class="col-sm">
+                <ul>
+                  <li>กินน้ำ 2 ขวด (3-4 ลิตร)</li>
+                  <li>ผัก &rarr; บล๊อคโคลี่ / กะหล่ำปลี / ถั่วเขียว / ผักกาด / ผักโขม</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 100px;" v-if="doc.diet_plan == 'lf'">
+          <div style="margin-bottom: 50px;">
+            <div class="row">
+              <h3>กลุ่มอาหารที่ต้อง<u class="text-danger">เลี่ยง</u>เพื่อให้น้ำหนักดีขึ้น</h3>
+            </div>
+            <div class="row">
+              <div class="col-sm">มีคำว่า &quot;Low fat&quot; โดยเฉพาะ &quot;นม&quot;</div>
+            </div>
+          </div>
+          <div style="margin-bottom: 50px;">
+            <div class="row">
+              <h3>เพิ่มพลัง Low-fat</h3>
+            </div>
+            <div class="row">
+              <div class="col-sm">ผักเขียว - ผักโขม, กระเทียม, กะหล่ำปลี</div>
+            </div>
+          </div>
+        </div>
+
         <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
               <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
               <router-link class="nav-item nav-link active" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+              <router-link class="nav-item nav-link" to="/settings">Settings</router-link>
             </nav>
-          </div>
-        </div>
-
-        <div class="modal fade loadingModal" tabindex="-1" role="dialog" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-              <div class="modal-body text-center">
-                <div class="spinner-border" role="status">
-                  <span class="sr-only">Loading...</span>
-                </div>
-                <div><b>{{ LOADING_MODAL_STRING }}</b></div>
-                <div class="alert alert-danger" role="alert" v-if="store.state.error != ''">
-                  {{ store.state.error }}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -768,6 +974,35 @@
       computed: Vuex.mapState(['user', 'doc']),
     };
 
+    const Settings = {
+      template: `
+      <div>
+        <div class="mb-5">
+          <h1>Settings</h1>
+        </div>
+
+        <div class="row">
+          <div class="col-sm list-group">
+            <router-link class="list-group-item list-group-item-action" to="/edit">Edit basic information</router-link>
+            <router-link class="list-group-item list-group-item-action text-danger" to="/logout"><b>Logout</b></router-link>
+          </div>
+        </div>
+
+        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+          <div class="container">
+            <nav class="nav nav-pills nav-justified">
+              <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
+              <router-link class="nav-item nav-link" to="/diet_plan">Diet Plan</router-link>
+              <router-link class="nav-item nav-link" to="/info" v-if="doc.diet_plan != 'blank'">Information</router-link>
+              <router-link class="nav-item nav-link active" to="/settings">Settings</router-link>
+            </nav>
+          </div>
+        </div>
+      </div>
+      `,
+      computed: Vuex.mapState(['user', 'doc']),
+    };
+
     const routes = [
       { path: '/', component: Login },
       { path: '/logout', component: Logout },
@@ -775,6 +1010,7 @@
       { path: '/profile', component: Profile },
       { path: '/diet_plan', component: DietPlan },
       { path: '/info', component: Information },
+      { path: '/settings', component: Settings },
     ];
 
     var router = new VueRouter({
