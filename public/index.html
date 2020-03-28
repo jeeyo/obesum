@@ -20,7 +20,7 @@
   <div id="app" class="container pt-3" style="overflow-x: hidden;">
     <router-view></router-view>
     
-    <div id="loadingModal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
+    <div id="loadingModal" class="modal" tabindex="-1" role="dialog" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
           <div class="modal-body text-center">
@@ -72,9 +72,9 @@
         sat: 12,
         sun: 12,
       },
-      if_checks: Array(21).fill().map(n => { return { no_eating: false, no_calories: false }; }),
-      lc_checks: Array(21).fill().map(n => { return { unsaturated_fat_0: '', unsaturated_fat_1: '', saturated_fat: '', protein: '' }; }),
-      lf_checks: Array(21).fill().map(n => { return { carb_with_fiber: '', unsaturated_fat: '', protein: '' }; }),
+      if_checks: Array(21).fill().map(n => ({ no_eating: false, no_calories: false })),
+      lc_checks: Array(21).fill().map(n => ({ unsaturated_fat_0: '', unsaturated_fat_1: '', saturated_fat: '', protein: '' })),
+      lf_checks: Array(21).fill().map(n => ({ carb_with_fiber: '', unsaturated_fat: '', protein: '' })),
       start_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
       update_diet_on: firebase.firestore.FieldValue.serverTimestamp(),
     };
@@ -398,7 +398,7 @@
           </div>
         </div>
 
-        <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" ref="newWeightInputModal">
+        <div class="modal" tabindex="-1" role="dialog" aria-hidden="true" ref="newWeightInputModal">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
               <div class="modal-body text-center">
@@ -414,7 +414,7 @@
           </div>
         </div>
 
-        <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" ref="feedbackInputModal">
+        <div class="modal" tabindex="-1" role="dialog" aria-hidden="true" ref="feedbackInputModal">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
               <div class="modal-body text-center">
@@ -666,7 +666,8 @@
                   <tr>
                     <th></th>
                     <th v-for="(d, i) in twentyOneDays" :style="{ backgroundColor: IF_WEEKS_COLOR_PALETTE[Math.floor(i / 7)] }">
-                      {{ d.format('ddd') }}
+                      <div>{{ d.format('ddd') }}</div>
+                      <div>{{ d.format('DD') }}</div>
                     </th>
                   </tr>
                 </thead>
@@ -734,7 +735,8 @@
                       <div style="transform: rotate(270deg);"><b>Week {{ (i / 7) + 1 }}</b></div>
                     </td>
                     <th class="align-middle">
-                      {{ d.format('ddd') }}
+                      <div>{{ d.format('ddd') }}</div>
+                      <div>{{ d.format('DD') }}</div>
                     </th>
                     <td class="align-middle">
                       <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LC_LF_UNSATURED_FAT_RECIPES, i , 'unsaturated_fat_0')">
@@ -780,7 +782,8 @@
                       <div style="transform: rotate(270deg);"><b>Week {{ (i / 7) + 1 }}</b></div>
                     </td>
                     <th class="align-middle">
-                      {{ d.format('ddd') }}
+                      <div>{{ d.format('ddd') }}</div>
+                      <div>{{ d.format('DD') }}</div>
                     </th>
                     <td class="align-middle">
                       <button type="button" class="btn btn-link" :disabled="shouldBeDisabled(d)" v-on:click="lcLfShowRecipeModal(LF_CARB_WITH_FIBER_RECIPES, i , 'carb_with_fiber')">
@@ -815,7 +818,7 @@
           </div>
         </div>
 
-        <div class="modal fade recipeModal" tabindex="-1" role="dialog" aria-hidden="true" ref="recipeModal">
+        <div class="modal recipeModal" tabindex="-1" role="dialog" aria-hidden="true" ref="recipeModal">
           <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
               <div class="modal-body list-group">
@@ -885,28 +888,106 @@
           return d.isSameOrBefore(today, 'day') ? false : true;
         },
         updateDOM: function() {
+          var that = this;
+
           if(this.doc.diet_plan == 'if')
           {
             $(this.$refs['whyNoEating']).tooltip({ html: true });
             $(this.$refs['whyNoCal']).tooltip({ html: true });
 
-            let ctx = this.$refs['ifChart'].getContext('2d');
-            let myDoughnutChart = new Chart(ctx, {
-              type: 'doughnut',
-              data: {
-                datasets: [{
-                  data: [IF_FASTING_PERIOD_LENGTH, 24 - IF_FASTING_PERIOD_LENGTH],
-                  backgroundColor: ['red', 'blue'],
-                }],
-              },
-              options: {
-                rotation: -1 * (this.doc.fasting_period[today.format('ddd').toLowerCase()] / 12) * Math.PI,
-                legends: { display: false },
-                tooltips: { enabled: false },
-                responsive: true,
-                maintainAspectRatio: false,
-              },
-            });
+            let canvas = this.$refs['ifChart'];
+            let ctx = canvas.getContext('2d');
+
+            (function pie_drawer() {
+
+              ctx.setTransform(1, 0, 0, 1, 0, 0);
+              ctx.fillStyle = 'white';
+              ctx.fill();
+
+              let myDoughnutChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                  datasets: [{
+                    data: [24 - IF_FASTING_PERIOD_LENGTH, IF_FASTING_PERIOD_LENGTH],
+                    backgroundColor: ['#ed553b', '#3caea3'],
+                  }],
+                },
+                options: {
+                  animation: false,
+                  rotation: ((that.doc.fasting_period[today.format('ddd').toLowerCase()] / 12) + 1.5) * Math.PI,
+                  legends: { display: false },
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  events: [],
+                },
+              });
+
+              // let's start with today's fasting period
+              let next_period_start = moment();
+              next_period_start.hours(that.doc.fasting_period[today.format('ddd').toLowerCase()]);
+              next_period_start.minutes(0);
+              next_period_start.seconds(0);
+              next_period_start.milliseconds(0);
+
+              let next_period_verb = 'ฟาสต์';
+
+              // now i'm fasting
+              if(moment().isSameOrAfter(next_period_start) && moment().isBefore(moment(next_period_start).add(16, 'hours'))) {
+                next_period_start.add(16, 'hours');
+                next_period_verb = 'กิน';
+              }
+              // i'm done fasting for today
+              else if(moment().isAfter(next_period_start) && moment().isAfter(moment(next_period_start).add(16, 'hours'))) {
+                next_period_start.hours(that.doc.fasting_period[moment(today).add(1, 'days').format('ddd').toLowerCase()]);
+              }
+
+              let width = parseInt($(canvas).css('width').slice(0, -2));
+              let height = parseInt($(canvas).css('height').slice(0, -2));
+              let radius = height / 2;
+              ctx.translate(width / 2, (height / 2) + 7);
+
+              let hours_to_next_period = Math.abs(moment().diff(next_period_start, 'hours'));
+              let minutes_to_next_period = Math.abs(moment().diff(next_period_start, 'minutes')) - (hours_to_next_period * 60);
+
+              // 24-hour clock hand
+              let hour = (moment().hours() * Math.PI / 12) +
+                (moment().minutes() * Math.PI / (12 * 60)) +
+                (moment().seconds() * Math.PI / (720 * 60));
+              ctx.beginPath();
+              ctx.lineWidth = 3;
+              ctx.strokeStyle = '#173f5f';
+              ctx.moveTo(0, 0);
+              ctx.rotate(hour);
+              ctx.lineTo(0, -radius * 0.70);
+              ctx.stroke();
+              ctx.rotate(-hour);
+
+              // 24-hour clock face
+              ctx.font = '14pt Arial';
+              ctx.textAlign = 'center';
+              ctx.fillStyle = 'white';
+              for(let i = 1; i <= 24; i++) {
+                let ang = i * Math.PI / 12;
+                ctx.rotate(ang);
+                ctx.translate(0, -radius * 0.85);
+                ctx.rotate(-ang);
+                ctx.fillText(`${i}`, 0, 0);
+                ctx.rotate(ang);
+                ctx.translate(0, radius * 0.85);
+                ctx.rotate(-ang);
+              }
+
+              // center text
+              ctx.font = '14pt Arial';
+              ctx.textAlign = 'center';
+              ctx.fillStyle = '#20639b';
+              ctx.fillText('อีก', 0, 0 - 21 - 3 - 6);
+              ctx.fillText(hours_to_next_period + ' ชั่วโมง', 0, 0 - 7 - 3);
+              ctx.fillText(minutes_to_next_period + ' นาที', 0, 0 + 7 + 6);
+              ctx.fillText('จะถึงเวลา' + next_period_verb, 0, 0 + 14 + 14 + 6);
+
+              setTimeout(pie_drawer.bind(this), 1000);
+            })();
           }
         },
       },
