@@ -51,6 +51,18 @@
 
   <script>
 
+    // let serviceWorker = null;
+
+    // if('serviceWorker' in navigator) {
+    //   navigator.serviceWorker.register('js/notification-sw.js')
+    //     .then(function(registration) {
+    //       serviceWorker = registration.active;
+    //     })
+    //     .catch(function(error) {
+    //       console.error('Service Worker Error', error);
+    //     });
+    // }
+
     const DEBUG = true;
     const USERNAME_SUFFIX = '@obesum.xyz';
     const DIET_PLANS = {
@@ -929,16 +941,31 @@
               next_period_start.seconds(0);
               next_period_start.milliseconds(0);
 
-              let next_period_verb = 'ฟาสต์';
+              let next_period_verb = 'กิน';
 
               // now i'm fasting
-              if(moment().isSameOrAfter(next_period_start) && moment().isBefore(moment(next_period_start).add(16, 'hours'))) {
-                next_period_start.add(16, 'hours');
-                next_period_verb = 'กิน';
+              if(moment().isSameOrAfter(next_period_start) && moment().isBefore(moment(next_period_start).add(8, 'hours'))) {
+                next_period_start.add(8, 'hours');
+                next_period_verb = 'ฟาสต์';
               }
               // i'm done fasting for today
-              else if(moment().isAfter(next_period_start) && moment().isAfter(moment(next_period_start).add(16, 'hours'))) {
-                next_period_start.hours(that.doc.fasting_period[moment(today).add(1, 'days').format('ddd').toLowerCase()]);
+              else if(moment().isAfter(next_period_start) && moment().isAfter(moment(next_period_start).add(8, 'hours'))) {
+                next_period_start.add(1, 'days').hours(that.doc.fasting_period[moment(today).add(1, 'days').format('ddd').toLowerCase()]);
+                next_period_verb = 'กิน';
+              }
+
+              let notification_time = next_period_start.subtract(5, 'minutes');
+              if(moment().hours() == notification_time.hours() &&
+                moment().minutes() == notification_time.minutes() &&
+                moment().seconds() == notification_time.seconds())
+              {
+                try {
+                  var notification = new Notification('แจ้งเตือนเวลา' + next_period_verb, {
+                    body: 'อีก 5 นาทีจะถึงเวลา' + next_period_verb,
+                  });
+                } catch (err) {
+                  alert('Notification API error: ' + err);
+                }
               }
 
               let width = parseInt($(canvas).css('width').slice(0, -2));
@@ -1183,7 +1210,8 @@
           <div class="list-group-item" v-if="DEBUG"><b>Today:</b> {{ today_date_string }}</div>
           <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Last Update Diet On:</b> {{ moment.unix(doc.update_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
           <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Start Diet On:</b> {{ moment.unix(doc.start_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
-          <router-link class="list-group-item list-group-item-action" to="/edit_profile">Edit basic information</router-link>
+          <router-link class="list-group-item list-group-item-action text-primary" to="/edit_profile">Edit basic information</router-link>
+          <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="registerNotification" v-if="doc.diet_plan == 'if' && notificationPermission != 'granted'">Register for IF Notifications</a>
           <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpBackwardADay" v-if="DEBUG">Jump Backward 1 day (For testing purpose)</a>
           <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpForwardADay" v-if="DEBUG">Jump Forward 1 day (For testing purpose)</a>
           <router-link class="list-group-item list-group-item-action text-danger" to="/logout"><b>Logout</b></router-link>
@@ -1204,10 +1232,22 @@
       data: function() {
         return {
           today_date_string: today.format('dddd, Do MMMM YYYY'),
+          notificationPermission: Notification.permission,
         };
       },
       computed: Vuex.mapState(['user', 'doc']),
       methods: {
+        registerNotification: function() {
+          let that = this;
+          if(this.doc.diet_plan != 'if')
+            return;
+
+          if(window.Notification && Notification.permission !== 'granted') {
+            Notification.requestPermission(function(status) {
+              that.notificationPermission = status;
+            });
+          }
+        },
         jumpBackwardADay: function() {
           if(!DEBUG) return;
           this.today_date_string = today.subtract(1, 'day').format('dddd, Do MMMM YYYY');
