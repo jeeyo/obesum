@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html style="height: 100%; overflow: hidden;">
+<html>
 
 <head>
   <!--meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;"-->
@@ -14,9 +14,21 @@
   <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-firestore.js"></script>
   <title>OBESUM</title>
+  <style type="text/css">
+  .stickyNavBar {
+    background-color: #17BEBB;
+  }
+  .stickyNavBar .nav-link {
+    color: #0E7C7B;
+  }
+  .stickyNavBar .nav-link.active {
+    color: #0E7C7B;
+    background-color: #b6fce6;
+  }
+  </style>
 </head>
 
-<body style="height: 100%; overflow: auto;">
+<body style="background-color: #b6fce6;">
   <div id="app" class="container pt-3" style="overflow-x: hidden;">
     <router-view></router-view>
     
@@ -51,19 +63,7 @@
 
   <script>
 
-    // let serviceWorker = null;
-
-    // if('serviceWorker' in navigator) {
-    //   navigator.serviceWorker.register('js/notification-sw.js')
-    //     .then(function(registration) {
-    //       serviceWorker = registration.active;
-    //     })
-    //     .catch(function(error) {
-    //       console.error('Service Worker Error', error);
-    //     });
-    // }
-
-    const DEBUG = true;
+    const DEBUG = false;
     const USERNAME_SUFFIX = '@obesum.xyz';
     const DIET_PLANS = {
       blank: 'กรุณาเลือกวิธีการลดน้ำหนักจากเมนู Diet Plan ด้านล่าง',
@@ -75,6 +75,7 @@
     const DEFAULT_DOC = {
       diet_plan: 'blank',
       bmi: [0, 0, 0],
+      // the name is `fasting_period` but it is actually `eating_period` for IF
       fasting_period: {
         mon: 12,
         tue: 12,
@@ -165,6 +166,7 @@
           <div class="spinner-border" role="status">
             <span class="sr-only">Loading...</span>
           </div>
+          <div class="alert alert-warning mt-3 mb-0" role="alert">หากหน้าต่างนี้ค้างอยู่นานเกินไป กรุณาคลิก<a href="#" onclick="location.reload()">รีเฟรช</a></div>
         </div>
         <div v-else>
           <div class="mb-5 text-center">
@@ -364,7 +366,7 @@
         <div class="mb-4">
           <h1>Your profile</h1>
         </div>
-        <div style="margin-bottom: 120px;">
+        <div style="margin-bottom: 200px;">
           <div class="row mb-2">
             <div class="col"><h2>Welcome, {{ doc.name }}</h2></div>
           </div>
@@ -399,7 +401,7 @@
           </div>
         </div>
 
-        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link active" to="/profile">Profile</router-link>
@@ -633,7 +635,7 @@
         <div class="mb-5">
           <h1>{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }}</h1>
         </div>
-        <div style="margin-bottom: 120px;" v-if="doc.diet_plan == 'blank'">
+        <div style="margin-bottom: 200px;" v-if="doc.diet_plan == 'blank'">
           <div class="card-deck">
             <div class="card">
               <div class="card-body">
@@ -667,7 +669,7 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 120px;" v-else-if="doc.diet_plan == 'if'">
+        <div style="margin-bottom: 200px;" v-else-if="doc.diet_plan == 'if'">
           <div class="row">
             <canvas ref="ifChart" width="300" height="300" style="width: 300px !important; height: 300px !important;"></canvas>
           </div>
@@ -728,7 +730,7 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 120px;" v-else-if="doc.diet_plan == 'lc'">
+        <div style="margin-bottom: 200px;" v-else-if="doc.diet_plan == 'lc'">
           <div class="row mt-3">
             <div class="w-100 overflow-auto">
               <table class="table table-bordered mb-0 text-center">
@@ -775,7 +777,7 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 120px;" v-else-if="doc.diet_plan == 'lf'">
+        <div style="margin-bottom: 200px;" v-else-if="doc.diet_plan == 'lf'">
           <div class="row mt-3">
             <div class="w-100 overflow-auto">
               <table class="table table-bordered mb-0 text-center">
@@ -819,7 +821,7 @@
           </div>
         </div>
 
-        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
@@ -843,7 +845,7 @@
                     </div>
                   </div>
                 </div>
-                <a href="#" class="list-group-item list-group-item-action" v-on:click="lcLfConfirmRecipe('')"><b>เอาออก</b></a>
+                <a href="#" class="list-group-item list-group-item-action text-danger" v-on:click="lcLfConfirmRecipe('')"><b>เอาออก</b></a>
               </div>
             </div>
           </div>
@@ -954,7 +956,7 @@
                 next_period_verb = 'กิน';
               }
 
-              let notification_time = next_period_start.subtract(5, 'minutes');
+              let notification_time = moment(next_period_start).subtract(5, 'minutes');
               if(moment().hours() == notification_time.hours() &&
                 moment().minutes() == notification_time.minutes() &&
                 moment().seconds() == notification_time.seconds())
@@ -974,7 +976,7 @@
               ctx.translate(width / 2, (height / 2) + 7);
 
               let hours_to_next_period = Math.abs(moment().diff(next_period_start, 'hours'));
-              let minutes_to_next_period = Math.abs(moment().diff(next_period_start, 'minutes')) - (hours_to_next_period * 60);
+              let minutes_to_next_period = Math.abs(moment().diff(next_period_start, 'minutes')) - (hours_to_next_period * 60) + 1;
 
               // 24-hour clock hand
               let hour = (moment().hours() * Math.PI / 12) +
@@ -1033,7 +1035,10 @@
         <div class="mb-5">
           <h1>{{ doc.diet_plan == 'blank' ? 'Diet Plan' : DIET_PLANS[doc.diet_plan] }} Information</h1>
         </div>
-        <div style="margin-bottom: 120px;" v-if="doc.diet_plan == 'if'">
+        <div style="margin-bottom: 200px;" v-if="doc.diet_plan == 'if'">
+          <div class="row mb-2">
+            <div class="col"><h2>ช่วงเวลากิน</h2></div>
+          </div>
           <div class="row" v-for="dow in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="dow">
             <div class="col-4">
               <h3>{{ dow }}</h3>
@@ -1071,7 +1076,7 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 120px;" v-if="doc.diet_plan == 'lc'">
+        <div style="margin-bottom: 200px;" v-if="doc.diet_plan == 'lc'">
           <div class="row">
             <div class="col"><h3>Side effects</h3></div>
           </div>
@@ -1095,71 +1100,79 @@
             <div class="col-3 text-center">วิงเวียนศีรษะ</div>
             <div class="col-3 text-center">หงุดหงิดง่าย</div>
           </div>
+
+          <div style="margin-top: 50px;">
+            <div class="row">
+              <div class="col"><h3>กลุ่มอาหารที่ต้อง<u class="text-danger">เลี่ยง</u>เพื่อให้น้ำหนักดีขึ้น</h3></div>
+            </div>
+            <div class="row">
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th scope="col">ของเหลว</th>
+                    <th scope="col">ผักมีคาร์โบไฮเดรต</th>
+                    <th scope="col">ชีส</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>แอลกอฮอล์</td>
+                    <td>เห็ด</td>
+                    <td>Brick cheese</td>
+                  </tr>
+                  <tr>
+                    <td>คาเฟอีน</td>
+                    <td>กระเทียม</td>
+                    <td>Mozzarella cheese</td>
+                  </tr>
+                  <tr>
+                    <td>ซอสทั่วไป</td>
+                    <td>มะเขือเทศ</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td>ฟัก</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-top: 50px;">
+            <div class="row">
+              <div class="col"><h3>เพิ่มพลัง Keto</h3></div>
+            </div>
+            <div class="row">
+              <div class="col">
+                <ul>
+                  <li>กินน้ำ 2 ขวด (3-4 ลิตร)</li>
+                  <li>ผัก &rarr; บล๊อคโคลี่ / กะหล่ำปลี / ถั่วเขียว / ผักกาด / ผักโขม</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div style="margin-top: 50px;">
-          <div class="row">
-            <div class="col"><h3>กลุ่มอาหารที่ต้อง<u class="text-danger">เลี่ยง</u>เพื่อให้น้ำหนักดีขึ้น</h3></div>
-          </div>
-          <div class="row">
-            <div class="col-4">
-              <ul>
-                <li>เครื่องดื่มแอลกอฮอล์</li>
-                <li>คาเฟอีน</li>
-                <li>ซอสทั่วไป</li>
-              </ul>
-            </div>
-            <div class="col-4">
-              <ul>
-                <li style="list-style-type: none;"><b>ผักที่มีคาร์โบไฮเดรต</b></li>
-                <li>เห็ด</li>
-                <li>กระเทียม</li>
-                <li>มะเขือเทศ</li>
-                <li>ฟัก</li>
-              </ul>
-            </div>
-            <div class="col-4">
-              <ul>
-                <li style="list-style-type: none;"><b>ชีส</b></li>
-                <li>Brick cheese</li>
-                <li>Mozzarella cheese</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 50px;">
-          <div class="row">
-            <div class="col"><h3>เพิ่มพลัง Keto</h3></div>
-          </div>
-          <div class="row">
-            <div class="col">
-              <ul>
-                <li>กินน้ำ 2 ขวด (3-4 ลิตร)</li>
-                <li>ผัก &rarr; บล๊อคโคลี่ / กะหล่ำปลี / ถั่วเขียว / ผักกาด / ผักโขม</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 120px;" v-if="doc.diet_plan == 'lf'">
+        <div style="margin-bottom: 200px;" v-if="doc.diet_plan == 'lf'">
           <div class="row">
             <div class="col"><h3>กลุ่มอาหารที่ต้อง<u class="text-danger">เลี่ยง</u>เพื่อให้น้ำหนักดีขึ้น</h3></div>
           </div>
           <div class="row">
             <div class="col offset-1">มีคำว่า &quot;Low fat&quot; โดยเฉพาะ &quot;นม&quot;</div>
           </div>
-        </div>
-        <div style="margin-top: 50px;">
-          <div class="row">
-            <div class="col"><h3>เพิ่มพลัง Low-fat</h3></div>
-          </div>
-          <div class="row">
-            <div class="col offset-1">ผักเขียว - ผักโขม, กระเทียม, กะหล่ำปลี</div>
+          <div style="margin-top: 50px;">
+            <div class="row">
+              <div class="col"><h3>เพิ่มพลัง Low-fat</h3></div>
+            </div>
+            <div class="row">
+              <div class="col offset-1">ผักเขียว - ผักโขม, กระเทียม, กะหล่ำปลี</div>
+            </div>
           </div>
         </div>
 
-        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
@@ -1206,18 +1219,20 @@
           <h1>Settings</h1>
         </div>
 
-        <div class="list-group">
-          <div class="list-group-item" v-if="DEBUG"><b>Today:</b> {{ today_date_string }}</div>
-          <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Last Update Diet On:</b> {{ moment.unix(doc.update_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
-          <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Start Diet On:</b> {{ moment.unix(doc.start_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
-          <router-link class="list-group-item list-group-item-action text-primary" to="/edit_profile">Edit basic information</router-link>
-          <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="registerNotification" v-if="doc.diet_plan == 'if' && notificationPermission != 'granted'">Register for IF Notifications</a>
-          <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpBackwardADay" v-if="DEBUG">Jump Backward 1 day (For testing purpose)</a>
-          <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpForwardADay" v-if="DEBUG">Jump Forward 1 day (For testing purpose)</a>
-          <router-link class="list-group-item list-group-item-action text-danger" to="/logout"><b>Logout</b></router-link>
+        <div style="margin-bottom: 200px;">
+          <div class="list-group">
+            <div class="list-group-item" v-if="DEBUG"><b>Today:</b> {{ today_date_string }}</div>
+            <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Last Update Diet On:</b> {{ moment.unix(doc.update_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
+            <div class="list-group-item" v-if="DEBUG && doc.diet_plan != 'blank'"><b>Start Diet On:</b> {{ moment.unix(doc.start_diet_on.seconds).format('dddd, Do MMMM YYYY') }}</div>
+            <router-link class="list-group-item list-group-item-action text-primary" to="/edit_profile">Edit basic information</router-link>
+            <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="registerNotification" v-if="doc.diet_plan == 'if' && window.Notification && notificationPermission != 'granted'">Register for IF Notifications</a>
+            <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpBackwardADay" v-if="DEBUG">Jump Backward 1 day (For testing purpose)</a>
+            <a href="#" class="list-group-item list-group-item-action text-primary" v-on:click="jumpForwardADay" v-if="DEBUG">Jump Forward 1 day (For testing purpose)</a>
+            <router-link class="list-group-item list-group-item-action text-danger" to="/logout"><b>Logout</b></router-link>
+          </div>
         </div>
 
-        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Profile</router-link>
@@ -1232,7 +1247,7 @@
       data: function() {
         return {
           today_date_string: today.format('dddd, Do MMMM YYYY'),
-          notificationPermission: Notification.permission,
+          notificationPermission: (window.Notification) ? Notification.permission : 'denied',
         };
       },
       computed: Vuex.mapState(['user', 'doc']),
@@ -1297,7 +1312,7 @@
           </p>
         </div>
 
-        <div class="fixed-bottom border-top bg-white shadow-lg pt-3 pb-3">
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
               <router-link class="nav-item nav-link" to="/profile">Back to Profile</router-link>
@@ -1357,7 +1372,7 @@
                   // skip v.doc.fasting_period
                   csv_lines[0] += `,"no calories","no eating"`;
                   for(let i = 0; i < 21; i++) {
-                    csv_lines[i + 1] += `,"${v.doc.if_checks[i].no_calories ? '✔' : '✘'}","${v.doc.if_checks[i].no_eating ? '✔' : '✘'}"`;
+                    csv_lines[i + 1] += `,"${v.doc.if_checks[i].no_calories ? 'yes' : 'no'}","${v.doc.if_checks[i].no_eating ? 'yes' : 'no'}"`;
                   }
                 } else if(v.doc.diet_plan == 'lc') {
                   csv_lines[0] += `,"unsaturated fat","unsaturated fat","saturated fat","protein"`;
@@ -1370,11 +1385,11 @@
                     csv_lines[i + 1] += `,"${v.doc.lf_checks[i].carb_with_fiber}","${v.doc.lf_checks[i].unsaturated_fat}","${v.doc.lf_checks[i].protein}"`;
                   }
                 }
-                return csv_lines.join('\r\n');
+                return csv_lines.join('%0D%0A');
               });
 
               if(csv.length > 0)
-                that.feedbacks_base64_csv = `data:text/csv;charset=utf-8,\uFEFF${csv.reduce((total, next) => total + '\r\n' + next)}`;
+                that.feedbacks_base64_csv = `data:text/csv;charset=utf-8,\uFEFF${csv.reduce((total, next) => total + '%0D%0A' + next)}`;
               that.feedbacks_base64_csv_filename = `${from_date.format('DDMMYYYY')}-${to_date.format('DDMMYYYY')}.csv`;
 
               that.loading = false;
