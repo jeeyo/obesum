@@ -98,6 +98,8 @@
     const LC_LF_PROTEIN_RECIPES = ['ไข่', 'นม', 'แฮม', 'เนื้อหมู', 'เนื้อไก่', 'ซีฟู้ด', 'เครื่องในสัตว์', 'เต้าหู้', 'ถั่ว'];
     const LF_CARB_WITH_FIBER_RECIPES = ['ข้าวโพด', 'ผลไม้', 'ข้าวกล้อง', 'มันม่วง', 'ขนมปังธัญพืช'];
 
+    const NUMBER_OF_USERS_CLOUDFN = 'https://us-central1-obesum-978f6.cloudfunctions.net/number_of_users';
+
     firebase.initializeApp({
       apiKey: 'AIzaSyCyumHT-DtyyUULlC-VNfDvKze0PWSzuqQ',
       authDomain: 'obesum-978f6.firebaseapp.com',
@@ -1312,6 +1314,15 @@
           </p>
         </div>
 
+        <div class="text-center" v-if="number_of_users > -1">
+          <p class="text-primary">Number of users: {{ number_of_users }}</p>
+        </div>
+        <div class="text-center" v-else>
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+
         <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
           <div class="container">
             <nav class="nav nav-pills nav-justified">
@@ -1328,6 +1339,7 @@
           number_of_feedbacks: -1,
           feedbacks_base64_csv_filename: '',
           feedbacks_base64_csv: '',
+          number_of_users: -1,
         };
       },
       computed: Vuex.mapState(['user', 'doc']),
@@ -1336,6 +1348,14 @@
           this.feedbacks = [];
           this.loading = true;
           let that = this;
+
+          $.get(NUMBER_OF_USERS_CLOUDFN)
+            .then(function(response) {
+              that.number_of_users = response.number_of_users;
+            })
+            .catch(function() {
+              that.number_of_users = 'error';
+            });
 
           let query = db.collection('feedbacks');
 
