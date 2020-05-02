@@ -375,6 +375,9 @@
           <div class="row mb-2" v-if="user.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1'">
             <div class="col"><router-link to="/feedbacks">View feedbacks</router-link></div>
           </div>
+          <div class="row mb-2" v-if="user.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1'">
+            <div class="col"><router-link to="/search_users">Search for users</router-link></div>
+          </div>
           <div class="row">
             <div class="col"><h3>Your BMI</h3></div>
           </div>
@@ -1342,7 +1345,6 @@
           number_of_users: -1,
         };
       },
-      computed: Vuex.mapState(['user', 'doc']),
       methods: {
         fetch: function() {
           this.feedbacks = [];
@@ -1419,15 +1421,6 @@
               that.loading = false;
             });
         },
-        startBMIOf: function(f) {
-          let bmi = f.doc.weight / (f.doc.height * f.doc.height / 10000);
-          return Math.round((bmi + Number.EPSILON) * 100) / 100;
-        },
-        lastBMIOf: function(f) {
-          let latestBMI = f.doc.bmi.find((b) => b != 0);
-          if(typeof latestBMI === 'undefined') return this.startBMIOf(f);
-          return latestBMI;
-        },
       },
       mounted: function() {
 
@@ -1447,6 +1440,73 @@
       },
     };
 
+    const SearchUsers = {
+      template: `
+      <div>
+        <div class="mb-5">
+          <h1>Search for users</h1>
+        </div>
+
+        <div class="input-group mb-1">
+          <input type="text" class="form-control" placeholder="ชื่อ" v-model="filter_by_name">
+          <div class="input-group-append">
+            <button type="button" class="btn btn-primary" v-on:click="fetch">Search</button>
+          </div>
+        </div>
+
+        <div class="text-center" v-if="loading">
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+        <div v-else>
+          <div v-for="u in users" :key="u">
+            <pre>{{ u }}</pre>
+          </div>
+        </div>
+
+        <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
+          <div class="container">
+            <nav class="nav nav-pills nav-justified">
+              <router-link class="nav-item nav-link" to="/profile">Back to Profile</router-link>
+            </nav>
+          </div>
+        </div>
+      </div>
+      `,
+      data: function() {
+        return {
+          loading: false,
+          filter_by_name: '',
+          users: [],
+        };
+      },
+      methods: {
+        fetch: function() {
+          this.users = [];
+          this.loading = true;
+          let that = this;
+
+          let query = db.collection('users');
+          query = query.where('name', '==', that.filter_by_name);
+
+          query
+            .get()
+            .then(function(snap) {
+              snap.docs.forEach(doc => {
+                that.users.push(JSON.stringify(doc.data(), null, 2));
+              });
+
+              that.loading = false;
+            })
+            .catch(function(error) {
+              console.log(error);
+              that.loading = false;
+            });
+        },
+      },
+    };
+
     const routes = [
       { path: '/', component: Login },
       { path: '/logout', component: Logout },
@@ -1457,6 +1517,7 @@
       { path: '/info', component: Information },
       { path: '/settings', component: Settings },
       { path: '/feedbacks', component: ViewFeedbacks },
+      { path: '/search_users', component: SearchUsers },
     ];
 
     let router = new VueRouter({
