@@ -6,7 +6,8 @@ service cloud.firestore {
       allow create, read: if request.auth.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1';
     }
     match /feedbacks/{feedbackId} {
-      allow create, read: if request.auth.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1';
+      allow read: if request.auth.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1';
+      allow create: if request.auth.uid != null;
     }
   }
 }
