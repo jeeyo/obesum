@@ -376,7 +376,7 @@
             <div class="col"><router-link to="/feedbacks">View feedbacks</router-link></div>
           </div>
           <div class="row mb-2" v-if="user.uid == 'sZEB6laBrURhjpFFt7nNHpTdjbr1'">
-            <div class="col"><router-link to="/search_users">Search for users</router-link></div>
+            <div class="col"><router-link to="/users">View users</router-link></div>
           </div>
           <div class="row">
             <div class="col"><h3>Your BMI</h3></div>
@@ -1412,7 +1412,7 @@
 
               if(csv.length > 0)
                 that.feedbacks_base64_csv = `data:text/csv;charset=utf-8,\uFEFF${csv.reduce((total, next) => total + '%0D%0A' + next)}`;
-              that.feedbacks_base64_csv_filename = `${from_date.format('DDMMYYYY')}-${to_date.format('DDMMYYYY')}.csv`;
+              that.feedbacks_base64_csv_filename = `feedbacks_${from_date.format('DDMMYYYY')}-${to_date.format('DDMMYYYY')}.csv`;
 
               that.loading = false;
             })
@@ -1440,18 +1440,27 @@
       },
     };
 
-    const SearchUsers = {
+    const ViewUsers = {
       template: `
       <div>
         <div class="mb-5">
-          <h1>Search for users</h1>
+          <h1>Users</h1>
         </div>
 
         <div class="input-group mb-1">
-          <input type="text" class="form-control" placeholder="ชื่อ" v-model="filter_by_name">
-          <div class="input-group-append">
-            <button type="button" class="btn btn-primary" v-on:click="fetch">Search</button>
+          <div class="input-group-prepend">
+            <span class="input-group-text">From</span>
           </div>
+          <input type="text" class="form-control" placeholder="จากวันที่" ref="filter_from_date">
+        </div>
+        <div class="input-group mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">To</span>
+          </div>
+          <input type="text" class="form-control" placeholder="ถึงวันที่" ref="filter_to_date">
+        </div>
+        <div class="input-group mb-3">
+          <button type="button" class="btn btn-primary" v-on:click="fetch">Search</button>
         </div>
 
         <div class="text-center" v-if="loading">
@@ -1459,10 +1468,12 @@
             <span class="sr-only">Loading...</span>
           </div>
         </div>
-        <div v-else>
-          <div v-for="u in users" :key="u">
-            <pre>{{ u }}</pre>
-          </div>
+
+        <div class="text-center" v-show="number_of_users > -1">
+          <p>There are {{ number_of_users }} users started dieting during this period</p>
+          <p v-if="number_of_users > 0">
+            <a :download="users_base64_csv_filename" :href="users_base64_csv">Download CSV</a>
+          </p>
         </div>
 
         <div class="stickyNavBar fixed-bottom border-top shadow-lg pt-3 pb-3">
@@ -1477,8 +1488,10 @@
       data: function() {
         return {
           loading: false,
-          filter_by_name: '',
           users: [],
+          number_of_users: -1,
+          users_base64_csv_filename: '',
+          users_base64_csv: '',
         };
       },
       methods: {
@@ -1488,14 +1501,59 @@
           let that = this;
 
           let query = db.collection('users');
-          query = query.where('name', '==', that.filter_by_name);
+
+          let from_date_string = $(this.$refs['filter_from_date']).val();
+          let to_date_string = $(this.$refs['filter_to_date']).val();
+
+          let from_date = moment(from_date_string, 'DD/MM/YYYY').isValid() ? moment(from_date_string, 'DD/MM/YYYY') : moment();
+          let to_date = moment(to_date_string, 'DD/MM/YYYY').isValid() ? moment(to_date_string, 'DD/MM/YYYY') : moment();
+
+          query = query.where('start_diet_on', '>=', from_date.toDate());
+          query = query.where('start_diet_on', '<=', to_date.toDate());
 
           query
             .get()
             .then(function(snap) {
+              that.number_of_users = snap.size;
+
               snap.docs.forEach(doc => {
-                that.users.push(JSON.stringify(doc.data(), null, 2));
+                that.users.push(doc.data());
               });
+
+              let csv = that.users.map(function(v) {
+                let csv_lines = [];
+                csv_lines[0] = `"name","age","gender","height","weight","diet_plan","bmi","start_diet_on","update_diet_on"`;
+                csv_lines[1] = `"${v.name}","${v.age}","${v.gender}","${v.height}","${v.weight}","${v.diet_plan}","${v.bmi[0]}","${moment.unix(v.start_diet_on.seconds).format('dddd, Do MMMM YYYY')}","${moment.unix(v.update_diet_on.seconds).format('dddd, Do MMMM YYYY')}"`;
+                csv_lines[2] = `"","","","","","","${v.bmi[1]}","",""`;
+                csv_lines[3] = `"","","","","","","${v.bmi[2]}","",""`;
+
+                for(let i = 0; i < 18; i++) {
+                  csv_lines[4 + i] = '"","","","","","","","",""';
+                }
+
+                if(v.diet_plan == 'if') {
+                  // skip v.fasting_period
+                  csv_lines[0] += `,"no calories","no eating"`;
+                  for(let i = 0; i < 21; i++) {
+                    csv_lines[i + 1] += `,"${v.if_checks[i].no_calories ? 'yes' : 'no'}","${v.if_checks[i].no_eating ? 'yes' : 'no'}"`;
+                  }
+                } else if(v.diet_plan == 'lc') {
+                  csv_lines[0] += `,"unsaturated fat","unsaturated fat","saturated fat","protein"`;
+                  for(let i = 0; i < 21; i++) {
+                    csv_lines[i + 1] += `,"${v.lc_checks[i].unsaturated_fat_0}","${v.lc_checks[i].unsaturated_fat_1}","${v.lc_checks[i].saturated_fat}","${v.lc_checks[i].protein}"`;
+                  }
+                } else if(v.diet_plan == 'lf') {
+                  csv_lines[0] += `,"carb with fiber","unsaturated fat","protein"`;
+                  for(let i = 0; i < 21; i++) {
+                    csv_lines[i + 1] += `,"${v.lf_checks[i].carb_with_fiber}","${v.lf_checks[i].unsaturated_fat}","${v.lf_checks[i].protein}"`;
+                  }
+                }
+                return csv_lines.join('%0D%0A');
+              });
+
+              if(csv.length > 0)
+                that.users_base64_csv = `data:text/csv;charset=utf-8,\uFEFF${csv.reduce((total, next) => total + '%0D%0A' + next)}`;
+              that.users_base64_csv_filename = `users_${from_date.format('DDMMYYYY')}-${to_date.format('DDMMYYYY')}.csv`;
 
               that.loading = false;
             })
@@ -1504,6 +1562,22 @@
               that.loading = false;
             });
         },
+      },
+      mounted: function() {
+
+        $(this.$refs['filter_from_date']).datetimepicker({
+          timepicker: false,
+          format: 'd/m/Y',
+        });
+        $(this.$refs['filter_from_date']).val(moment().format('DD/MM/YYYY'));
+
+        $(this.$refs['filter_to_date']).datetimepicker({
+          timepicker: false,
+          format: 'd/m/Y',
+        });
+        $(this.$refs['filter_to_date']).val(moment().format('DD/MM/YYYY'));
+
+        this.fetch();
       },
     };
 
@@ -1517,7 +1591,7 @@
       { path: '/info', component: Information },
       { path: '/settings', component: Settings },
       { path: '/feedbacks', component: ViewFeedbacks },
-      { path: '/search_users', component: SearchUsers },
+      { path: '/users', component: ViewUsers },
     ];
 
     let router = new VueRouter({
